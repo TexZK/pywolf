@@ -225,7 +225,7 @@ class ResourceManager(object):
         if count is None:
             count = len(chunks_handler) - start
         assert 0 <= count
-        assert not count or 0 <= start < count
+        assert 0 <= start
 
         self._chunks_handler = chunks_handler
         self._start = start
@@ -255,6 +255,9 @@ class ResourceManager(object):
         return item
 
     def _build_resource(self, index, chunk):
+        raise NotImplementedError
+
+    def _destroy_resource(self, index):  # TODO: add support (here and into the cache)
         raise NotImplementedError
 
     def clear(self):

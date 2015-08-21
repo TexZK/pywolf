@@ -61,26 +61,61 @@ class Test(unittest.TestCase):
             for i, sprite in enumerate(sprite_manager):
                 sprite.image.save(r'./outputs/sprite_{}.png'.format(i))
 
-    def testPicture(self):
+    def testPictures(self):
         logger = logging.getLogger()
-        logger.info('testPicture')
+        logger.info('testPictures')
 
         partition_map = self._partition_map
         palette_map = self._palette_map
         graphics_chunks_handler = pywolf.persistence.GraphicsChunksHandler()
+        start, count = partition_map['pics']
 
         with open(r'../data/wl6/vgahead.wl6', 'rb') as (header_file
         ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
         ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
             graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
-
-            start, count = partition_map['pics']
             picture_manager = pywolf.graphics.PictureManager(graphics_chunks_handler, palette_map, start, count)
 
             for i, picture in enumerate(picture_manager):
                 picture.image.save(r'./outputs/picture_{}.png'.format(i))
 
-    # TODO: testTile8()
+    def testTile8(self):
+        logger = logging.getLogger()
+        logger.info('testTile8')
+
+        partition_map = self._partition_map
+        palette_map = self._palette_map
+        graphics_chunks_handler = pywolf.persistence.GraphicsChunksHandler()
+        start, count = partition_map['tile8']
+
+        with open(r'../data/wl6/vgahead.wl6', 'rb') as (header_file
+        ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
+        ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
+            graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
+            tile8_manager = pywolf.graphics.Tile8Manager(graphics_chunks_handler, palette_map, start, count)
+
+            for i, tile8 in enumerate(tile8_manager):
+                tile8.image.save(r'./outputs/tile8_{}.png'.format(i))
+
+    def testFonts(self):
+        logger = logging.getLogger()
+        logger.info('testFonts')
+
+        partition_map = self._partition_map
+        palette_map = self._palette_map
+        graphics_chunks_handler = pywolf.persistence.GraphicsChunksHandler()
+        start, count = partition_map['font']
+
+        with open(r'../data/wl6/vgahead.wl6', 'rb') as (header_file
+        ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
+        ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
+            graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
+            font_manager = pywolf.graphics.FontManager(graphics_chunks_handler, start, count)
+
+            for i, font in enumerate(font_manager):
+                for j, image in enumerate(font.images):
+                    if image is not None:
+                        image.save(r'./outputs/font_{}_{}.png'.format(i, j))
 
 
 if __name__ == "__main__":

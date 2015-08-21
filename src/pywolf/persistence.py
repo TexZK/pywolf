@@ -349,8 +349,8 @@ class FontHeader(object):
 
     def __init__(self, height, offsets, widths):
         assert 0 < height
-        assert len(offsets) == 256
-        assert len(widths) == 256
+        assert len(offsets) == type(self).CHARACTER_COUNT
+        assert len(widths) == type(self).CHARACTER_COUNT
 
         self.height = height
         self.offsets = offsets
@@ -358,9 +358,9 @@ class FontHeader(object):
 
     @classmethod
     def from_stream(cls, chunk_stream):
-        height = stream_unpack('<H', chunk_stream)
-        locations = stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT)
-        widths = stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT)
+        height = stream_unpack('<H', chunk_stream)[0]
+        locations = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
+        widths = list(stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT))
         return cls(height, locations, widths)
 
 

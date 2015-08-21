@@ -8,7 +8,7 @@ import struct
 from PIL import Image
 
 from .persistence import FontHeader, SpriteHeader
-from .utils import ResourceManager
+from .utils import ResourceManager, sequence_getitem
 
 
 ALPHA_INDEX = 0xFF
@@ -109,6 +109,38 @@ class PictureManager(ResourceManager):
         return Picture(dimensions, pixels, palette)
 
 
+class Tile8Manager(ResourceManager):
+
+    def __init__(self, chunks_handler, palette_map, start=None, count=None, cache=None):
+        super().__init__(chunks_handler, start, count, cache)
+        self._palette_map = palette_map
+
+    def _get(self, index):
+        chunks_handler = self._chunks_handler
+        start = self._start
+        cache = self._cache
+
+        try:
+            item = cache[index]
+        except KeyError:
+            chunk = chunks_handler[start]
+            item = self._build_resource(index, chunk)
+            cache[index] = item
+        return item
+
+    def _build_resource(self, index, chunk):
+        palette_map = self._palette_map
+        start = self._start
+
+        area = 8 * 8
+        offset = index * area
+        chunk = chunk[offset:(offset + area)]
+        dimensions = (8, 8)
+        pixels = bytes(pixels_linearize(chunk, dimensions))
+        palette = palette_map.get(start, palette_map[...])
+        return Picture(dimensions, pixels, palette)
+
+
 class Texture(object):
 
     def __init__(self, dimensions, pixels, palette, alpha_index=None):
@@ -166,8 +198,10 @@ class Font(object):
     def __init__(self, height, widths, glyphs_pixels):
         count = len(glyphs_pixels)
         binary_palette = rgbpalette_flatten(((0x00, 0x00, 0x00), (0xFF, 0xFF, 0xFF)))
-        images = [make_8bit_image((widths[i], height), glyphs_pixels[i], binary_palette, 0)
-                  for i in range(count)]
+        images = [None] * count
+        for i in range(count):
+            if widths[i]:
+                images[i] = make_8bit_image((widths[i], height), glyphs_pixels[i], binary_palette, 0)
 
         self.height = height
         self.widths = widths

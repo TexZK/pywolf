@@ -320,10 +320,7 @@ class Test(unittest.TestCase):
             audio_chunks_handler.load(data_file, header_file)
 
         for i, item in enumerate(audio_chunks_handler):
-            try:
-                header, chunk = item
-            except ValueError:
-                raise
+            header, chunk = item
             with open(r'./outputs/audio_{}.chunk'.format(i), 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
@@ -342,7 +339,20 @@ class Test(unittest.TestCase):
             with open(r'./outputs/graphics_{}.chunk'.format(i), 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
-    # TODO: testMap()
+    def testMap(self):
+        logger = logging.getLogger()
+        logger.info('testMap')
+
+        map_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
+        with open(r'../data/wl6/maphead.wl6', 'rb') as (header_file
+        ),   open(r'../data/wl6/gamemaps.wl6', 'rb') as data_file:
+            map_chunks_handler.load(data_file, header_file)
+
+        for i, item in enumerate(map_chunks_handler):
+            header, planes = item
+            with open(r'./outputs/map_{}.chunk'.format(i), 'wb') as chunk_file:
+                for plane in planes:
+                    chunk_file.write(plane)
 
 
 if __name__ == "__main__":
