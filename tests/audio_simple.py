@@ -34,10 +34,18 @@ class Test(unittest.TestCase):
         with open(r'../data/wl6/vswap.wl6', 'rb') as data_file:
             vswap_chunks_handler.load(data_file)
 
+            start = 0
+            count = len(vswap_chunks_handler.sounds_infos)
             sample_manager = pywolf.audio.SampledSoundManager(vswap_chunks_handler,
-                                                              frequency=pywolf.configs.wl6.SOUNDS_FREQUENCY)  # FIXME: start=?
-            sample = sample_manager[0]
-        sample.wave_write(r'./outputs/sample_0.wav')
+                                                              frequency=pywolf.configs.wl6.SOUNDS_FREQUENCY,
+                                                              start=start, count=count)
+
+            for i, sample in enumerate(sample_manager):
+                sample.wave_write(r'./outputs/sample_{}.wav'.format(i))
+
+    # TODO: testAdLibSounds()
+
+    # TODO: testBuzzerSounds()
 
 
 if __name__ == "__main__":
