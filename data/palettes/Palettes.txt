@@ -1,0 +1,11 @@
+"Wolf.pal" - the colour palette used throughout the original Wolfenstein 3D.
+"Spear.pal" - the colour palette used for in game graphics in Spear of Destiny. It is basically the same as the original Wolf 3d palette, but there are 2 colours which were changed (you may notice that Trans Grosse and the Ubermutant do not display correct colours in FloEdit).
+"Spear title.pal" - the colour palette used in the Spear of Destiny title screen.
+"Spear whitehouse.pal" - the colour palette used in the Spear of Destiny end game picture showing BJ and the President.
+"Spear smash.pal" is for the Spear of Destiny end game picture image of BJ smashing through the wall with the words, "But that's another story..."
+"Spear credits.pal" is for all the Spear of Destiny end game yellow-orange pictures except the Trans Grosse image, which uses the one named "Spear idlogo.pal". 
+"Spear idlogo.pal" is for the Spear of Destiny end game picture of Trans Grosse.
+"Spear thanks.pal" is used for the image that has the Death Knight and the words, "Thanks for playing..."
+
+Thanks to Wolf Skevos-Jones for providing most of these palette files.
+
