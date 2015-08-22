@@ -7,8 +7,7 @@ import struct
 
 from PIL import Image
 
-from .persistence import FontHeader, SpriteHeader
-from .utils import ResourceManager, sequence_getitem
+from .utils import ResourceManager, stream_unpack, stream_unpack_array
 
 
 ALPHA_INDEX = 0xFF
@@ -165,6 +164,21 @@ class TextureManager(ResourceManager):
         return Texture(dimensions, pixels, palette)
 
 
+class SpriteHeader(object):
+
+    def __init__(self, left, right, offsets):
+        self.left = left
+        self.right = right
+        self.offsets = offsets
+
+    @classmethod
+    def from_stream(cls, chunk_stream):
+        left, right = stream_unpack('<HH', chunk_stream)
+        width = right - left + 1
+        offsets = list(stream_unpack_array('<H', chunk_stream, width))
+        return cls(left, right, offsets)
+
+
 class Sprite(object):
 
     def __init__(self, dimensions, pixels, palette, alpha_index=ALPHA_INDEX):
@@ -191,6 +205,27 @@ class SpriteManager(ResourceManager):
         pixels = sprite_expand(chunk, dimensions, alpha_index)
         pixels = bytes(pixels_transpose(pixels, dimensions))
         return Sprite(dimensions, pixels, palette, alpha_index)
+
+
+class FontHeader(object):
+
+    CHARACTER_COUNT = 256
+
+    def __init__(self, height, offsets, widths):
+        assert 0 < height
+        assert len(offsets) == type(self).CHARACTER_COUNT
+        assert len(widths) == type(self).CHARACTER_COUNT
+
+        self.height = height
+        self.offsets = offsets
+        self.widths = widths
+
+    @classmethod
+    def from_stream(cls, chunk_stream):
+        height = stream_unpack('<H', chunk_stream)[0]
+        locations = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
+        widths = list(stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT))
+        return cls(height, locations, widths)
 
 
 class Font(object):

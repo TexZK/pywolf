@@ -11,6 +11,7 @@ from .utils import (stream_bound, stream_read, stream_write,
                     sequence_index, sequence_getitem,
                     huffman_expand, carmack_expand, rlew_expand,
                     HUFFMAN_NODES_COUNT)
+from .game import MapHeader
 
 
 def jascpal_read(stream):
@@ -128,21 +129,6 @@ class PrecachedChunksHandler(ChunksHandler):
         self._chunks = chunks
 
 
-class SpriteHeader(object):
-
-    def __init__(self, left, right, offsets):
-        self.left = left
-        self.right = right
-        self.offsets = offsets
-
-    @classmethod
-    def from_stream(cls, chunk_stream):
-        left, right = stream_unpack('<HH', chunk_stream)
-        width = right - left + 1
-        offsets = list(stream_unpack_array('<H', chunk_stream, width))
-        return cls(left, right, offsets)
-
-
 class VSwapChunksHandler(ChunksHandler):
 
     def clear(self):
@@ -247,41 +233,6 @@ class PrecachedVSwapChunksHandler(VSwapChunksHandler, PrecachedChunksHandler):
         return self
 
 
-class AdLibSoundHeader(object):
-
-    def __init__(self,
-                 length, priority,
-                 modulator_char, carrier_char,
-                 modulator_scale, carrier_scale,
-                 modulator_attack, carrier_attack,
-                 modulator_sustain, carrier_sustain,
-                 modulator_wave, carrier_wave,
-                 conn, voice, mode, block):
-        self.length            = length
-        self.priority          = priority
-        self.modulator_char    = modulator_char
-        self.carrier_char      = carrier_char
-        self.modulator_scale   = modulator_scale
-        self.carrier_scale     = carrier_scale
-        self.modulator_attack  = modulator_attack
-        self.carrier_attack    = carrier_attack
-        self.modulator_sustain = modulator_sustain
-        self.carrier_sustain   = carrier_sustain
-        self.modulator_wave    = modulator_wave
-        self.carrier_wave      = carrier_wave
-        self.conn              = conn
-        self.voice             = voice
-        self.mode              = mode
-        self.block             = block
-
-    @classmethod
-    def from_stream(cls, data_stream):
-        args = list(stream_unpack('<LH13B', data_stream))
-        stream_unpack('<3B', data_stream)  # unused
-        args += stream_unpack('<B', data_stream)
-        return cls(*args)
-
-
 class AudioChunksHandler(ChunksHandler):
 
     def clear(self):
@@ -314,20 +265,12 @@ class AudioChunksHandler(ChunksHandler):
 
     def extract_chunk(self, index):
         self._log_extract_chunk(index)
-        chunk_count = self._chunk_count
-        chunk_offsets = self._chunk_offsets
         data_stream = self._data_stream
-        data_size = self._data_size
-        index = sequence_index(index, chunk_count)
 
-        header = None
-        chunk = b''
-        chunk_size = chunk_offsets[index + 1] - chunk_offsets[index]
-        if chunk_size:
-            self._seek(index)
-            header = AdLibSoundHeader.from_stream(data_stream)
-            chunk = stream_read(data_stream, (data_size - data_stream.tell()))
-        return (header, chunk)
+        chunk_size = self._sizeof(index)
+        self._seek(index)
+        chunk = stream_read(data_stream, chunk_size)
+        return chunk
 
 
 class PrecachedAudioChunksHandler(AudioChunksHandler, PrecachedChunksHandler):
@@ -341,27 +284,6 @@ class PrecachedAudioChunksHandler(AudioChunksHandler, PrecachedChunksHandler):
                      header_base, header_size)
         self._precache_all_chunks()
         return self
-
-
-class FontHeader(object):
-
-    CHARACTER_COUNT = 256
-
-    def __init__(self, height, offsets, widths):
-        assert 0 < height
-        assert len(offsets) == type(self).CHARACTER_COUNT
-        assert len(widths) == type(self).CHARACTER_COUNT
-
-        self.height = height
-        self.offsets = offsets
-        self.widths = widths
-
-    @classmethod
-    def from_stream(cls, chunk_stream):
-        height = stream_unpack('<H', chunk_stream)[0]
-        locations = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
-        widths = list(stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT))
-        return cls(height, locations, widths)
 
 
 class GraphicsChunksHandler(ChunksHandler):
@@ -512,26 +434,6 @@ class PrecachedGraphicsChunksHandler(GraphicsChunksHandler, PrecachedChunksHandl
                      huffman_offset, huffman_size)
         self._precache_all_chunks()
         return self
-
-
-class MapHeader(object):
-
-    def __init__(self, plane_offsets, plane_sizes, width, height, name):
-        self.plane_offsets = plane_offsets
-        self.plane_sizes = plane_sizes
-        self.width = width
-        self.height = height
-        self.name = name
-
-    @classmethod
-    def from_stream(cls, data_stream, planes_count=3):
-        planes_count = int(planes_count)
-        assert planes_count > 0
-        plane_offsets = tuple(stream_unpack_array('<L', data_stream, planes_count))
-        plane_sizes = tuple(stream_unpack_array('<H', data_stream, planes_count))
-        width, height = stream_unpack('<HH', data_stream)
-        name = stream_unpack('<16s', data_stream)
-        return cls(plane_offsets, plane_sizes, width, height, name)
 
 
 class MapChunksHandler(ChunksHandler):  # TODO

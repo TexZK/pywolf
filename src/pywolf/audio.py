@@ -5,7 +5,7 @@
 import struct
 import wave
 
-from .utils import ResourceManager
+from .utils import ResourceManager, stream_unpack
 
 
 SAMPLE_RATE = 7042
@@ -29,6 +29,41 @@ def samples_expand(chunks_handler, index):
             remaining = 0
         chunk_index += 1
     return b''.join(chunks)
+
+
+class AdLibSoundHeader(object):
+
+    def __init__(self,
+                 length, priority,
+                 modulator_char, carrier_char,
+                 modulator_scale, carrier_scale,
+                 modulator_attack, carrier_attack,
+                 modulator_sustain, carrier_sustain,
+                 modulator_wave, carrier_wave,
+                 conn, voice, mode, block):
+        self.length            = length
+        self.priority          = priority
+        self.modulator_char    = modulator_char
+        self.carrier_char      = carrier_char
+        self.modulator_scale   = modulator_scale
+        self.carrier_scale     = carrier_scale
+        self.modulator_attack  = modulator_attack
+        self.carrier_attack    = carrier_attack
+        self.modulator_sustain = modulator_sustain
+        self.carrier_sustain   = carrier_sustain
+        self.modulator_wave    = modulator_wave
+        self.carrier_wave      = carrier_wave
+        self.conn              = conn
+        self.voice             = voice
+        self.mode              = mode
+        self.block             = block
+
+    @classmethod
+    def from_stream(cls, data_stream):
+        args = list(stream_unpack('<LH13B', data_stream))
+        stream_unpack('<3B', data_stream)  # unused
+        args += stream_unpack('<B', data_stream)
+        return cls(*args)
 
 
 class SampledSound(object):
