@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
             start = 0
             count = len(vswap_chunks_handler.sounds_infos)
             sample_manager = pywolf.audio.SampledSoundManager(vswap_chunks_handler,
-                                                              frequency=pywolf.configs.wl6.SOUNDS_FREQUENCY,
+                                                              pywolf.configs.wl6.SAMPLED_SOUNDS_FREQUENCY,
                                                               start=start, count=count)
 
             for i, sample in enumerate(sample_manager):

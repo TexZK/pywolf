@@ -8,27 +8,32 @@ import wave
 from .utils import ResourceManager, stream_unpack
 
 
-SAMPLE_RATE = 7042
-
-
 def samples_expand(chunks_handler, index):
     sounds_start = chunks_handler.sounds_start
     sounds_infos = chunks_handler.sounds_infos
     start, length = sounds_infos[index]
 
-    chunks = []
     chunk_index = sounds_start + start
     remaining = length
     while remaining:
         chunk = chunks_handler[chunk_index]
         if len(chunk) <= remaining:
-            chunks.append(chunk)
+            yield from chunk
             remaining -= len(chunk)
         else:
-            chunks.append(chunk[:remaining])
+            yield from memoryview(chunk)[:remaining]
             remaining = 0
         chunk_index += 1
-    return b''.join(chunks)
+
+
+def samples_upsample(samples, factor):
+    assert 1 < factor
+    remainder = 0
+    for sample in samples:
+        times = factor + remainder
+        times_floor = int(times)
+        yield from (sample for _ in range(times_floor))
+        remainder = times - times_floor
 
 
 class AdLibSoundHeader(object):
@@ -86,8 +91,7 @@ class SampledSound(object):
 
 class SampledSoundManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None,
-                 frequency=SAMPLE_RATE):
+    def __init__(self, chunks_handler, frequency, start=None, count=None, cache=None):
         super().__init__(chunks_handler, start, count, cache)
         self.frequency = frequency
 
@@ -95,5 +99,5 @@ class SampledSoundManager(ResourceManager):
         chunks_handler = self._chunks_handler
         frequency = self.frequency
 
-        samples = samples_expand(chunks_handler, index)
+        samples = bytes(samples_expand(chunks_handler, index))
         return SampledSound(frequency, samples)
