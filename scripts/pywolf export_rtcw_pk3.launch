@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.python.pydev.debug.regularLaunchConfigurationType">
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/pywolf/scripts/export_rtcw_pk3.py"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="1"/>
+</listAttribute>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_LOCATION" value="${workspace_loc:pywolf/scripts/export_rtcw_pk3.py}"/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_OTHER_WORKING_DIRECTORY" value=""/>
+<stringAttribute key="org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS" value="&quot;--input-folder&quot; &quot;C:\Users\TexZK\Documents\GitHub\pywolf\data\wl6&quot;&#13;&#10;&quot;--vswap-data&quot; &quot;vswap.wl6&quot;&#13;&#10;&quot;--graphics-data&quot; &quot;vgagraph.wl6&quot;&#13;&#10;&quot;--graphics-header&quot; &quot;vgahead.wl6&quot;&#13;&#10;&quot;--graphics-huffman&quot; &quot;vgadict.wl6&quot;&#13;&#10;&quot;--audio-data&quot; &quot;audiot.wl6&quot;&#13;&#10;&quot;--audio-header&quot; &quot;audiohed.wl6&quot;&#13;&#10;&quot;--maps-data&quot; &quot;gamemaps.wl6&quot;&#13;&#10;&quot;--maps-header&quot; &quot;maphead.wl6&quot;&#13;&#10;&quot;--output-folder&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Return to Castle Wolfenstein\Main&quot;&#13;&#10;&quot;--output-pk3&quot; &quot;wolf3d.pk3&quot;"/>
+<stringAttribute key="org.python.pydev.debug.ATTR_INTERPRETER" value="__default"/>
+<stringAttribute key="org.python.pydev.debug.ATTR_PROJECT" value="pywolf"/>
+<stringAttribute key="process_factory_id" value="org.python.pydev.debug.processfactory.PyProcessFactory"/>
+</launchConfiguration>
