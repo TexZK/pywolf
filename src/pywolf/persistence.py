@@ -6,42 +6,11 @@ import io
 import logging
 import struct
 
-from .utils import (stream_bound, stream_read, stream_write,
-                    stream_unpack, stream_unpack_array,
+from .utils import (stream_bound, stream_read, stream_unpack, stream_unpack_array,
                     sequence_index, sequence_getitem,
                     huffman_expand, carmack_expand, rlew_expand,
                     HUFFMAN_NODES_COUNT)
 from .game import MapHeader
-
-
-def jascpal_read(stream):
-    line = stream.readline().strip()
-    assert line == 'JASC-PAL'
-    line = stream.readline().strip()
-    assert line == '0100'
-    line = stream.readline().strip()
-    count = int(line)
-    assert count > 0
-    palette = [None] * count
-    for i in range(count):
-        r, g, b = [int(x) for x in stream.readline().split()]
-        assert 0x00 <= r <= 0xFF
-        assert 0x00 <= g <= 0xFF
-        assert 0x00 <= b <= 0xFF
-        palette[i] = [r, g, b]
-    return palette
-
-
-def jascpal_write(stream, palette):
-    assert palette
-    stream_write(stream, 'JASC-PAL\n')
-    stream_write(stream, '0100\n')
-    stream_write(stream, '{:d}\n'.format(len(palette)))
-    for r, g, b in palette:
-        assert 0x00 <= r <= 0xFF
-        assert 0x00 <= g <= 0xFF
-        assert 0x00 <= b <= 0xFF
-        stream_write(stream, '{:d} {:d} {:d}\n'.format(r, g, b))
 
 
 class ChunksHandler(object):
@@ -241,9 +210,9 @@ class AudioChunksHandler(ChunksHandler):
         self._header_base = None
         self._header_size = None
 
-    def load(self, header_stream, data_stream,
-             header_base=None, header_size=None,
-             data_base=None, data_size=None):
+    def load(self, data_stream, header_stream,
+             data_base=None, data_size=None,
+             header_base=None, header_size=None):
 
         super().load(data_stream, data_base, data_size)
         data_size = self._data_size
@@ -467,17 +436,17 @@ class MapChunksHandler(ChunksHandler):  # TODO
         carmacized = bool(carmacized)
         assert planes_count > 0
         header_base, header_size = stream_bound(header_stream, header_base, header_size)
-        assert header_size % struct.calcsize('<H') == 0
 
         rlew_tag = stream_unpack('<H', header_stream)[0]
 
+        assert (header_size - struct.calcsize('<H')) % struct.calcsize('<L') == 0
         chunk_count = (header_size - struct.calcsize('<H')) // struct.calcsize('<L')
         chunk_offsets = [None] * chunk_count
         for i in range(chunk_count):
             offset = stream_unpack('<L', header_stream)[0]
             if 0 < offset < 0xFFFFFFFF:
                 chunk_offsets[i] = offset
-        chunk_offsets.append(header_size)
+        chunk_offsets.append(data_size)
         for i in reversed(range(chunk_count)):
             if chunk_offsets[i] is None:
                 chunk_offsets[i] = chunk_offsets[i + 1]
@@ -513,7 +482,7 @@ class MapChunksHandler(ChunksHandler):  # TODO
 
             for i in range(planes_count):
                 self._seek(i, header.plane_offsets)
-                expanded_size = stream_unpack('<H', data_stream)
+                expanded_size = stream_unpack('<H', data_stream)[0]
                 compressed_size = header.plane_sizes[i] - struct.calcsize('<H')
                 chunk = stream_read(data_stream, compressed_size)
                 if carmacized:

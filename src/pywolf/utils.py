@@ -54,7 +54,7 @@ def carmack_expand(data, expanded_size):
     assert expanded_size % struct.calcsize('<H') == 0
 
     output = bytearray()
-    expand = output.expand
+    extend = output.extend
 
     it = iter(data)
     length = expanded_size >> 1
@@ -68,13 +68,13 @@ def carmack_expand(data, expanded_size):
                     offset = len(output) - (next(it) << 1)
                 else:
                     offset = (next(it) | (next(it) << 8)) << 1
-                expand(output[offset:(offset + (count << 1))])
+                extend(output[offset:(offset + (count << 1))])
                 length -= count
             else:
-                expand([next(it), tag])
+                extend([next(it), tag])
                 length -= 1
         else:
-            expand([count, tag])
+            extend([count, tag])
             length -= 1
 
     return bytes(memoryview(output))
@@ -115,7 +115,7 @@ def rlew_compress(data, tag):
 def rlew_expand(data, tag):
     output = array.array('H')
     append = output.append
-    expand = output.expand
+    extend = output.extend
 
     it = iter(data)
     while True:
@@ -126,7 +126,7 @@ def rlew_expand(data, tag):
         if datum == tag:
             count = next(it) | (next(it) << 8)
             value = next(it) | (next(it) << 8)
-            expand(value for _ in range(count))
+            extend(value for _ in range(count))
         else:
             append(datum)
 
@@ -178,6 +178,15 @@ def stream_write(stream, raw):
 
 def stream_pack(stream, fmt, *args):
     return stream_write(stream, struct.pack(fmt, *args))
+
+
+def stream_pack_array(stream, fmt, values, scalar=True):
+    if scalar:
+        for value in values:
+            return stream_write(stream, struct.pack(fmt, value))
+    else:
+        for entry in values:
+            return stream_write(stream, struct.pack(fmt, *entry))
 
 
 def stream_unpack(fmt, stream):

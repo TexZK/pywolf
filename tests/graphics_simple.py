@@ -21,11 +21,26 @@ class Test(unittest.TestCase):
         logger.setLevel(logging.DEBUG)
         self._stdout_handler = stdout_handler
         self._partition_map = pywolf.configs.wl6.GRAPHICS_PARTITIONS_MAP
+        self._palette = pywolf.configs.wl6.GRAPHICS_PALETTE
         self._palette_map = pywolf.configs.wl6.GRAPHICS_PALETTE_MAP
 
     def tearDown(self):
         logger = logging.getLogger()
         logger.removeHandler(self._stdout_handler)
+
+    def testPalette(self):
+        logger = logging.getLogger()
+        logger.info('testPalette')
+        with open(r'../data/palettes/wolf.pal', 'rt') as jascpal_file:
+            palette = pywolf.graphics.jascpal_read(jascpal_file)
+        assert len(palette) == len(self._palette)
+        for pc, rc in zip(palette, self._palette):
+            assert len(pc) == len(rc)
+            for pv, rv in zip(pc, rc):
+                assert pv == rv
+
+        with open(r'./outputs/wolf.pal', 'wt') as jascpal_file:
+            pywolf.graphics.jascpal_write(jascpal_file, palette)
 
     def testTextures(self):
         logger = logging.getLogger()
@@ -110,7 +125,7 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
         ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
             graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
-            font_manager = pywolf.graphics.FontManager(graphics_chunks_handler, start, count)
+            font_manager = pywolf.graphics.FontManager(graphics_chunks_handler, palette_map[...], start, count)
 
             for i, font in enumerate(font_manager):
                 for j, image in enumerate(font.images):

@@ -27,20 +27,6 @@ class Test(unittest.TestCase):
         logger = logging.getLogger()
         logger.removeHandler(self._stdout_handler)
 
-    def testPalette(self):
-        logger = logging.getLogger()
-        logger.info('testPalette')
-        with open(r'../data/palettes/wolf.pal', 'rt') as jascpal_file:
-            palette = pywolf.persistence.jascpal_read(jascpal_file)
-        assert len(palette) == len(REFERENCE_PALETTE)
-        for pc, rc in zip(palette, REFERENCE_PALETTE):
-            assert len(pc) == len(rc)
-            for pv, rv in zip(pc, rc):
-                assert pv == rv
-
-        with open(r'./outputs/wolf.pal', 'wt') as jascpal_file:
-            pywolf.persistence.jascpal_write(jascpal_file, palette)
-
     def testVSwap(self):
         logger = logging.getLogger()
         logger.info('testVSwap')
@@ -62,8 +48,7 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/audiot.wl6', 'rb') as data_file:
             audio_chunks_handler.load(data_file, header_file)
 
-        for i, item in enumerate(audio_chunks_handler):
-            header, chunk = item
+        for i, chunk in enumerate(audio_chunks_handler):
             with open(r'./outputs/audio_{}.chunk'.format(i), 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
@@ -93,9 +78,12 @@ class Test(unittest.TestCase):
 
         for i, item in enumerate(map_chunks_handler):
             header, planes = item
-            with open(r'./outputs/map_{}.chunk'.format(i), 'wb') as chunk_file:
-                for plane in planes:
-                    chunk_file.write(plane)
+            if header is not None:
+                with open(r'./outputs/map_{}_header.chunk'.format(i), 'wb') as header_file:
+                    header.to_stream(header_file)
+                for j, plane in enumerate(planes):
+                    with open(r'./outputs/map_{}_plane{}.chunk'.format(i, j), 'wb') as chunk_file:
+                        chunk_file.write(plane)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 @author: Andrea Zoppi
 '''
 
-from .utils import stream_unpack, stream_unpack_array
+from .utils import stream_pack, stream_pack_array, stream_unpack, stream_unpack_array
 
 
 class Entity(object):
@@ -54,8 +54,14 @@ class MapHeader(object):
         plane_offsets = tuple(stream_unpack_array('<L', data_stream, planes_count))
         plane_sizes = tuple(stream_unpack_array('<H', data_stream, planes_count))
         width, height = stream_unpack('<HH', data_stream)
-        name = stream_unpack('<16s', data_stream)
+        name = stream_unpack('<16s', data_stream)[0].decode('ascii')
         return cls(plane_offsets, plane_sizes, width, height, name)
+
+    def to_stream(self, data_stream):
+        stream_pack_array(data_stream, '<L', self.plane_offsets)
+        stream_pack_array(data_stream, '<H', self.plane_sizes)
+        stream_pack(data_stream, '<HH', self.width, self.height)
+        stream_pack(data_stream, '<16s', self.name.encode('ascii'))
 
 
 class Map(object):

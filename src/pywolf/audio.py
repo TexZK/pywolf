@@ -36,6 +36,15 @@ def samples_upsample(samples, factor):
         remainder = times - times_floor
 
 
+def wave_write(file, frequency, samples):
+    with wave.open(file, 'w') as wave_stream:
+        wave_stream.setnchannels(1)
+        wave_stream.setsampwidth(struct.calcsize('<B'))
+        wave_stream.setframerate(frequency)
+        wave_stream.setnframes(len(samples))
+        wave_stream.writeframesraw(samples)
+
+
 class AdLibSoundHeader(object):
 
     def __init__(self,
@@ -80,13 +89,7 @@ class SampledSound(object):
     def wave_write(self, file):
         frequency = self.frequency
         samples = self.samples
-
-        with wave.open(file, 'wb') as wave_file:
-            wave_file.setnchannels(1)
-            wave_file.setsampwidth(struct.calcsize('<B'))
-            wave_file.setframerate(frequency)
-            wave_file.setnframes(len(samples))
-            wave_file.writeframesraw(samples)
+        wave_write(file, frequency, samples)
 
 
 class SampledSoundManager(ResourceManager):

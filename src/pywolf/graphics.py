@@ -7,7 +7,7 @@ import struct
 
 from PIL import Image
 
-from .utils import ResourceManager, stream_unpack, stream_unpack_array
+from .utils import ResourceManager, stream_write, stream_pack, stream_unpack, stream_unpack_array
 
 
 ALPHA_INDEX = 0xFF
@@ -80,6 +80,57 @@ def make_8bit_image(dimensions, pixels, palette, alpha_index=None):
     if alpha_index is not None:
         image.info['transparency'] = alpha_index
     return image
+
+
+def jascpal_read(stream):
+    line = stream.readline().strip()
+    assert line == 'JASC-PAL'
+    line = stream.readline().strip()
+    assert line == '0100'
+    line = stream.readline().strip()
+    count = int(line)
+    assert count > 0
+    palette = [None] * count
+    for i in range(count):
+        r, g, b = [int(x) for x in stream.readline().split()]
+        assert 0x00 <= r <= 0xFF
+        assert 0x00 <= g <= 0xFF
+        assert 0x00 <= b <= 0xFF
+        palette[i] = [r, g, b]
+    return palette
+
+
+def jascpal_write(stream, palette):
+    assert palette
+    stream_write(stream, 'JASC-PAL\n')
+    stream_write(stream, '0100\n')
+    stream_write(stream, '{:d}\n'.format(len(palette)))
+    for r, g, b in palette:
+        assert 0x00 <= r <= 0xFF
+        assert 0x00 <= g <= 0xFF
+        assert 0x00 <= b <= 0xFF
+        stream_write(stream, '{:d} {:d} {:d}\n'.format(r, g, b))
+
+
+def write_targa_rgbx(stream, dimensions, depth_bits, pixels_xbgr):
+    stream_pack(stream, '<BBBHHBHHHHBB',
+                0, #  id_length
+                0,  # colormap_type
+                2,  # image_type: RGB(A)
+                0,  # colormap_index
+                0,  # colormap_length
+                0,  # colormap_size
+                0,  # x_origin
+                0,  # y_origin
+                dimensions[0], # width
+                dimensions[1], # height
+                depth_bits,  # pixel_size: 24|32
+                0x20)  # attributes: top-down
+    stream_write(stream, pixels_xbgr)
+
+
+def build_color_image(dimensions, color):
+    return Image.new('RGB', dimensions, color)
 
 
 class Picture(object):
@@ -230,19 +281,23 @@ class FontHeader(object):
 
 class Font(object):
 
-    def __init__(self, height, widths, glyphs_pixels):
+    def __init__(self, height, widths, glyphs_pixels, palette, alpha_index=0xFF):
         count = len(glyphs_pixels)
-        binary_palette = rgbpalette_flatten(((0x00, 0x00, 0x00), (0xFF, 0xFF, 0xFF)))
         images = [None] * count
         for i in range(count):
             if widths[i]:
-                images[i] = make_8bit_image((widths[i], height), glyphs_pixels[i], binary_palette, 0)
+                images[i] = make_8bit_image((widths[i], height), glyphs_pixels[i], palette)
 
         self.height = height
         self.widths = widths
         self.images = images
 
+    def __len__(self):
+        return len(self.widths)
+
     def __getitem__(self, key):
+        if isinstance(key, str):
+            key = ord(key)
         return self.images[key]
 
     def __call__(self, text):
@@ -274,15 +329,20 @@ class Font(object):
                 else:
                     start = endex
                     width = delta
-        return '\n'.join(lines)
+        return lines
 
 
 class FontManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None):
+    def __init__(self, chunks_handler, palette, start=None, count=None, cache=None, alpha_index=0xFF):
         super().__init__(chunks_handler, start, count, cache)
+        self._palette = palette
+        self._alpha_index = alpha_index
 
     def _build_resource(self, index, chunk):
+        palette = self._palette
+        alpha_index = self._alpha_index
+
         header = FontHeader.from_stream(io.BytesIO(chunk))
         character_count = type(header).CHARACTER_COUNT
         height = header.height
@@ -293,5 +353,5 @@ class FontManager(ResourceManager):
             width = header.widths[i]
             glyphs_pixels[i] = chunk[offset:(offset + (width * height))]
 
-        return Font(height, header.widths, glyphs_pixels)
+        return Font(height, header.widths, glyphs_pixels, palette, alpha_index)
 
