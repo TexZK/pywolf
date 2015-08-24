@@ -8,6 +8,14 @@ from ..graphics import rgbpalette_flatten
 SAMPLED_SOUNDS_FREQUENCY = 7042
 
 
+SOUNDS_PARTITIONS_MAP = {
+    'buzzer':   (  0,  87),
+    'adlib':    ( 87,  87),
+    'digital':  (174,  87),
+    'music':    (261,  27),
+}
+
+
 GRAPHICS_PARTITIONS_MAP = {
     'struct':   (  0,   1),
     'font':     (  1,   2),
@@ -877,4 +885,34 @@ SAMPLED_SOUND_NAMES = (
     'gretel__wake',
     'gretel__death',
     'fettgesicht__death',
+)
+
+MUSIC_NAMES = (
+    'Enemy Around the Corner',
+    'Into the Dungeons',
+    'The March to War',
+    'Get Them Before They Get You',
+    'Pounding Headache',
+    'Hitler Waltz',
+    'Kill the S.O.B.',
+    'Horst-Wessel-Lied',
+    'Nazi Anthem',
+    'P.O.W.',
+    'Salute',
+    'Searching For the Enemy',
+    'Suspense',
+    'Victors',
+    'Wondering About My Loved Ones',
+    'Funk You!',
+    'End of Level',
+    'Going After Hitler',
+    'Lurking...',
+    'The Ultimate Challenge',
+    'The Nazi Rap',
+    'Zero Hour',
+    'Twelfth Hour',
+    'Roster',
+    'U R A Hero',
+    'Victory March',
+    'Wolf Pac',
 )

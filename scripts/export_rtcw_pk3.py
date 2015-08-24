@@ -2,18 +2,24 @@
 @author: Andrea Zoppi
 '''
 
-import sys
 import argparse
-import os
 import io
 import logging
+import os
+import subprocess
+import sys
+import tempfile
 import zipfile
+
 from PIL import Image
 
-import pywolf.persistence
+from pywolf.audio import samples_upsample, wave_write
 import pywolf.configs.wl6 as CONFIG_WL6
 from pywolf.graphics import write_targa_rgbx, build_color_image
-from pywolf.audio import samples_upsample, wave_write
+import pywolf.persistence
+
+
+IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav.exe')
 
 
 TEXTURE_SHADER_TEMPLATE = '''
@@ -64,7 +70,9 @@ def build_argument_parser():
 
     group = parser.add_argument_group('settings')  # TODO
     group.add_argument('--config', default='wl6')
-    group.add_argument('--wave-frequency', default=22050, type=int)
+    group.add_argument('--wave-frequency', default=44100, type=int)
+    group.add_argument('--imf-frequency', default=700, type=int)
+    group.add_argument('--imf2wav-path', default=IMF2WAV_PATH)
 
     return parser
 
@@ -92,8 +100,8 @@ def export_textures(params, config, zip_file, vswap_chunks_handler):
     palette = config.GRAPHICS_PALETTE
     for i, color in enumerate(palette):
         path = 'textures/wolf3d/palette_0x{:02X}.tga'.format(i)
-        logger.info('Texture palette color [%d/%d]: (0x%02X, 0x%02X, 0x%02X)',
-                    (i + 1), len(palette), *color)
+        logger.info('Texture palette color [%d/%d]: %r (0x%02X, 0x%02X, 0x%02X)',
+                    (i + 1), len(palette), path, *color)
         image = build_color_image(config.TEXTURE_DIMENSIONS, color)
         pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
@@ -204,6 +212,68 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
         zip_file.writestr(path, wave_file.getbuffer())
 
 
+def convert_imf_chunk_to_wave_file(params, imf_chunk):
+    imf2wav_path = params.imf2wav_path
+    imf_frequency = params.imf_frequency
+    wave_frequency = params.wave_frequency
+    chunk_path = ''
+    wave_path = ''
+    tempdir_path = tempfile.gettempdir()
+    PIPE = subprocess.PIPE
+
+    try:
+        with tempfile.NamedTemporaryFile('wb', delete=False) as chunk_file:
+            chunk_file.write(imf_chunk)
+        chunk_path = os.path.join(tempdir_path, chunk_file.name)
+
+        with tempfile.NamedTemporaryFile('wb', delete=False) as wave_file:
+            pass
+        wave_path = os.path.join(tempdir_path, wave_file.name)
+
+        args = [imf2wav_path, chunk_path, wave_path, str(imf_frequency), str(wave_frequency)]
+        subprocess.Popen(args, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE).communicate()
+
+        return wave_path
+
+    except:
+        try:
+            os.unlink(wave_path)
+        except:
+            pass
+        raise
+
+    finally:
+        try:
+            os.unlink(chunk_path)
+        except:
+            pass
+
+
+def export_musics(params, config, zip_file, audio_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting musics')
+
+    start, count = config.SOUNDS_PARTITIONS_MAP['music']
+
+    for i in range(count):
+        chunk_index = start + i
+        name = config.MUSIC_NAMES[i]
+        path = 'music/{}.wav'.format(name)
+        logger.info('Music [%d/%d]: %r', (i + 1), count, path)
+        imf_chunk = audio_chunks_handler[chunk_index]
+        wave_path = convert_imf_chunk_to_wave_file(params, imf_chunk)
+        try:
+            with open(wave_path, 'rb') as wave_file:
+                wave_samples = wave_file.read()
+            zip_file.writestr(path, wave_samples)
+
+        finally:
+            try:
+                os.unlink(wave_path)
+            except:
+                pass
+
+
 def main(*args):  # TODO
     logger = logging.getLogger()
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -211,7 +281,6 @@ def main(*args):  # TODO
     logger.addHandler(stdout_handler)
     logger.setLevel(logging.DEBUG)
 
-    print(args)
     parser = build_argument_parser()
     params = parser.parse_args(args)
 
@@ -233,10 +302,10 @@ def main(*args):  # TODO
         graphics_chunks_handler.load(data_file, header_file, huffman_file,
                                      config.GRAPHICS_PARTITIONS_MAP)
 
-#     map_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
-#     with open(os.path.join(params.input_folder, params.maps_header), 'rb') as (header_file
-#     ),   open(os.path.join(params.input_folder, params.maps_data), 'rb') as data_file:
-#         map_chunks_handler.load(data_file, header_file)
+    map_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
+    with open(os.path.join(params.input_folder, params.maps_header), 'rb') as (header_file
+    ),   open(os.path.join(params.input_folder, params.maps_data), 'rb') as data_file:
+        map_chunks_handler.load(data_file, header_file)
 
     with zipfile.ZipFile(os.path.join(params.output_folder, params.output_pk3), 'w', zipfile.ZIP_DEFLATED) as zip_file:
         export_shaders(params, config, zip_file)
@@ -247,7 +316,7 @@ def main(*args):  # TODO
         # TODO: export_tile8(params, config, zip_file, graphics_chunks_handler)
 
         export_sampled_sounds(params, config, zip_file, vswap_chunks_handler)
-        # TODO: export_musics(params, config, zip_file, audio_chunks_handler)
+        export_musics(params, config, zip_file, audio_chunks_handler)
         # TODO: export_adlib_sounds(params, config, zip_file, audio_chunks_handler)
         # TODO: export_buzzer_sounds(params, config, zip_file, audio_chunks_handler)
 
