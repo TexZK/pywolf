@@ -916,3 +916,9 @@ MUSIC_NAMES = (
     'Victory March',
     'Wolf Pac',
 )
+
+BUZZER_SOUND_NAMES = (  # TODO
+    '',
+)
+
+ADLIB_SOUND_NAMES = BUZZER_SOUND_NAMES

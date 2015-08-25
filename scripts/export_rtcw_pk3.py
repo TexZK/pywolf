@@ -202,11 +202,11 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
                                                       start, count)
     scale_factor = params.wave_frequency / config.SAMPLED_SOUNDS_FREQUENCY
 
-    for i, sampled_sound in enumerate(sample_manager):
+    for i, sound in enumerate(sample_manager):
         name = config.SAMPLED_SOUND_NAMES[i]
-        path = 'sound/{}.wav'.format(name)
+        path = 'sound/sampled/{}.wav'.format(name)
         logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
-        samples = bytes(samples_upsample(sampled_sound.samples, scale_factor))
+        samples = bytes(samples_upsample(sound.samples, scale_factor))
         wave_file = io.BytesIO()
         wave_write(wave_file, params.wave_frequency, samples)
         zip_file.writestr(path, wave_file.getbuffer())
@@ -274,6 +274,47 @@ def export_musics(params, config, zip_file, audio_chunks_handler):
                 pass
 
 
+def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting AdLib sounds')
+
+    start, count = config.SOUNDS_PARTITIONS_MAP['adlib']
+
+    for i in range(count):
+        chunk_index = start + i
+        name = i  # FIXME: config.ADLIB_SOUND_NAMES[i]
+        path = 'sound/adlib/{}.wav'.format(name)
+        logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
+        imf_chunk = audio_chunks_handler[chunk_index]
+        wave_path = convert_imf_chunk_to_wave_file(params, imf_chunk)
+        try:
+            with open(wave_path, 'rb') as wave_file:
+                wave_samples = wave_file.read()
+            zip_file.writestr(path, wave_samples)
+
+        finally:
+            try:
+                os.unlink(wave_path)
+            except:
+                pass
+
+
+def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting buzzer sounds')
+
+    start, count = config.SOUNDS_PARTITIONS_MAP['buzzer']
+    buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start, count)
+
+    for i, sound in enumerate(buzzer_manager):
+        name = i  # FIXME: config.BUZZER_SOUND_NAMES[i]
+        path = 'sound/buzzer/{}.wav'.format(name)
+        logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
+        wave_file = io.BytesIO()
+        sound.wave_write(wave_file, params.wave_frequency)
+        zip_file.writestr(path, wave_file.getbuffer())
+
+
 def main(*args):  # TODO
     logger = logging.getLogger()
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -318,7 +359,7 @@ def main(*args):  # TODO
         export_sampled_sounds(params, config, zip_file, vswap_chunks_handler)
         export_musics(params, config, zip_file, audio_chunks_handler)
         # TODO: export_adlib_sounds(params, config, zip_file, audio_chunks_handler)
-        # TODO: export_buzzer_sounds(params, config, zip_file, audio_chunks_handler)
+        export_buzzer_sounds(params, config, zip_file, audio_chunks_handler)
 
         # TODO: export_maps(params, config, zip_file, map_chunks_handler)
         # TODO: export_models(params, config, zip_file, ?)

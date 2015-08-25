@@ -2,13 +2,13 @@
 @author: Andrea Zoppi
 '''
 
-import unittest
-import sys
 import logging
+import sys
+import unittest
 
-import pywolf.persistence
 import pywolf.audio
 import pywolf.configs.wl6
+import pywolf.persistence
 
 
 class Test(unittest.TestCase):
@@ -40,12 +40,28 @@ class Test(unittest.TestCase):
                                                               pywolf.configs.wl6.SAMPLED_SOUNDS_FREQUENCY,
                                                               start=start, count=count)
 
-            for i, sample in enumerate(sample_manager):
-                sample.wave_write(r'./outputs/sample_{}.wav'.format(i))
+            for i, sound in enumerate(sample_manager):
+                sound.wave_write(r'./outputs/sample_{}.wav'.format(i))
+
+    # TODO: testMusics()
 
     # TODO: testAdLibSounds()
 
-    # TODO: testBuzzerSounds()
+    def testBuzzerSounds(self):
+        logger = logging.getLogger()
+        logger.info('testBuzzerSounds')
+
+        audio_chunks_handler = pywolf.persistence.AudioChunksHandler()
+
+        with open('../data/wl6/audiohed.wl6', 'rb') as (header_file
+        ),   open('../data/wl6/audiot.wl6', 'rb') as data_file:
+            audio_chunks_handler.load(data_file, header_file)
+
+            start, count = pywolf.configs.wl6.SOUNDS_PARTITIONS_MAP['buzzer']
+            buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start=start, count=count)
+
+            for i, sound in enumerate(buzzer_manager):
+                sound.wave_write(r'./outputs/buzzer_{}.wav'.format(i))
 
 
 if __name__ == "__main__":
