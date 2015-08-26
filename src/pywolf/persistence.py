@@ -304,8 +304,7 @@ class GraphicsChunksHandler(ChunksHandler):
         assert all(0 <= chunk_offsets[i] <= data_size for i in range(chunk_count))
         assert all(chunk_offsets[i] <= chunk_offsets[i + 1] for i in range(chunk_count))
 
-        huffman_nodes = list(stream_unpack_array('<HH', huffman_stream,
-                                                  HUFFMAN_NODES_COUNT, scalar=False))
+        huffman_nodes = list(stream_unpack_array('<HH', huffman_stream, HUFFMAN_NODES_COUNT, scalar=False))
         self._chunk_count = chunk_count
         self._chunk_offsets = chunk_offsets
         self._header_stream = header_stream
@@ -362,8 +361,7 @@ class GraphicsChunksHandler(ChunksHandler):
             expanded_size = stream_unpack('<L', data_stream)[0]
             compressed_size -= struct.calcsize('<L')
 
-        logger.debug('%r._read_sizes(index=%d), partition_map[%r]=%r, '
-                     'compressed_size=0x%X, expanded_size=0x%X',
+        logger.debug(('%r._read_sizes(index=%d), partition_map[%r]=%r, compressed_size=0x%X, expanded_size=0x%X'),
                      self, index, key, value, compressed_size, expanded_size)
 
         return compressed_size, expanded_size
@@ -415,15 +413,6 @@ class MapChunksHandler(ChunksHandler):  # TODO
         self._carmacized = True
         self._rlew_tag = None
         self.planes_count = 0
-
-    def _seek(self, index, offsets=None):
-        data_stream = self._data_stream
-        data_base = self._data_base
-        if offsets is None:
-            offset = self._offsetof(index)
-        else:
-            offset = offsets[sequence_index(index, len(offsets))]
-        data_stream.seek(data_base + offset)
 
     def load(self, data_stream, header_stream,
              data_base=None, data_size=None,

@@ -11,6 +11,9 @@ import pywolf.configs.wl6
 import pywolf.persistence
 
 
+IMF2WAV_PATH = '../tools/imf2wav.exe'
+
+
 class Test(unittest.TestCase):
 
     def setUp(self):
@@ -43,9 +46,44 @@ class Test(unittest.TestCase):
             for i, sound in enumerate(sample_manager):
                 sound.wave_write(r'./outputs/sample_{}.wav'.format(i))
 
-    # TODO: testMusics()
+    def testMusics(self):
+        logger = logging.getLogger()
+        logger.info('testMusics')
 
-    # TODO: testAdLibSounds()
+        audio_chunks_handler = pywolf.persistence.AudioChunksHandler()
+
+        with open('../data/wl6/audiohed.wl6', 'rb') as (header_file
+        ),   open('../data/wl6/audiot.wl6', 'rb') as data_file:
+            audio_chunks_handler.load(data_file, header_file)
+
+            start, count = pywolf.configs.wl6.AUDIO_PARTITIONS_MAP['music']
+            music_manager = pywolf.audio.MusicManager(audio_chunks_handler, start, count)
+
+            for i, sound in enumerate(music_manager):
+                path = './outputs/music_{}.wav'.format(i)
+                chunk_path = './outputs/music_{}.chunk'.format(i)
+                imf_chunk = sound.to_imf_chunk()
+                pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)
+
+    def testAdLibSounds(self):
+        logger = logging.getLogger()
+        logger.info('testAdLibSounds')
+
+        audio_chunks_handler = pywolf.persistence.AudioChunksHandler()
+
+        with open('../data/wl6/audiohed.wl6', 'rb') as (header_file
+        ),   open('../data/wl6/audiot.wl6', 'rb') as data_file:
+            audio_chunks_handler.load(data_file, header_file)
+
+            start, count = pywolf.configs.wl6.AUDIO_PARTITIONS_MAP['adlib']
+            adlib_manager = pywolf.audio.AdLibSoundManager(audio_chunks_handler, start, count)
+
+            for i, sound in enumerate(adlib_manager):
+                path = './outputs/adlib_{}.wav'.format(i)
+                chunk_path = './outputs/adlib_{}.chunk'.format(i)
+                imf_chunk = sound.to_imf_chunk()
+                pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)
+
 
     def testBuzzerSounds(self):
         logger = logging.getLogger()
@@ -57,7 +95,7 @@ class Test(unittest.TestCase):
         ),   open('../data/wl6/audiot.wl6', 'rb') as data_file:
             audio_chunks_handler.load(data_file, header_file)
 
-            start, count = pywolf.configs.wl6.SOUNDS_PARTITIONS_MAP['buzzer']
+            start, count = pywolf.configs.wl6.AUDIO_PARTITIONS_MAP['buzzer']
             buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start=start, count=count)
 
             for i, sound in enumerate(buzzer_manager):

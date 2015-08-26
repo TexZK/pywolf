@@ -6,16 +6,14 @@ import argparse
 import io
 import logging
 import os
-import subprocess
 import sys
-import tempfile
 import zipfile
 
 from PIL import Image
 
-from pywolf.audio import samples_upsample, wave_write
+from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave
 import pywolf.configs.wl6 as CONFIG_WL6
-from pywolf.graphics import write_targa_rgbx, build_color_image
+from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
 
 
@@ -54,24 +52,25 @@ def build_argument_parser():
 
     group = parser.add_argument_group('input paths')
     group.add_argument('--input-folder', default='.')
-    group.add_argument('--vswap-data', required=True)  # TODO
-    group.add_argument('--graphics-data', required=True)  # TODO
-    group.add_argument('--graphics-header', required=True)  # TODO
-    group.add_argument('--graphics-huffman', required=True)  # TODO
-    group.add_argument('--audio-data', required=True)  # TODO
-    group.add_argument('--audio-header', required=True)  # TODO
-    group.add_argument('--maps-data', required=True)  # TODO
-    group.add_argument('--maps-header', required=True)  # TODO
+    group.add_argument('--vswap-data', required=True)
+    group.add_argument('--graphics-data', required=True)
+    group.add_argument('--graphics-header', required=True)
+    group.add_argument('--graphics-huffman', required=True)
+    group.add_argument('--audio-data', required=True)
+    group.add_argument('--audio-header', required=True)
+    group.add_argument('--maps-data', required=True)
+    group.add_argument('--maps-header', required=True)
     group.add_argument('--palette')  # TODO
 
     group = parser.add_argument_group('output paths')
     group.add_argument('--output-folder', default='.')
-    group.add_argument('--output-pk3', required=True)  # TODO
+    group.add_argument('--output-pk3', required=True)
 
-    group = parser.add_argument_group('settings')  # TODO
+    group = parser.add_argument_group('settings')
     group.add_argument('--config', default='wl6')
-    group.add_argument('--wave-frequency', default=44100, type=int)
-    group.add_argument('--imf-frequency', default=700, type=int)
+    group.add_argument('--short-name', default='wolf3d')
+    group.add_argument('--wave-rate', default=44100, type=int)
+    group.add_argument('--imf-rate', default=700, type=int)
     group.add_argument('--imf2wav-path', default=IMF2WAV_PATH)
 
     return parser
@@ -90,35 +89,35 @@ def export_textures(params, config, zip_file, vswap_chunks_handler):
 
     for i, texture in enumerate(texture_manager):
         name = config.TEXTURE_NAMES[i >> 1]
-        path = 'textures/wolf3d/{}__{}.tga'.format(name, (i & 1))
+        path = 'textures/{}/{}__{}.tga'.format(params.short_name, name, (i & 1))
         logger.info('Texture [%d/%d]: %r', (i + 1), count, path)
         pixels_bgr = bytes(x for pixel in texture.image.convert('RGB').getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
-        write_targa_rgbx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
+        write_targa_bgrx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
 
     palette = config.GRAPHICS_PALETTE
     for i, color in enumerate(palette):
-        path = 'textures/wolf3d/palette_0x{:02X}.tga'.format(i)
+        path = 'textures/{}/palette_0x{:02X}.tga'.format(params.short_name, i)
         logger.info('Texture palette color [%d/%d]: %r (0x%02X, 0x%02X, 0x%02X)',
                     (i + 1), len(palette), path, *color)
         image = build_color_image(config.TEXTURE_DIMENSIONS, color)
         pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
-        write_targa_rgbx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
+        write_targa_bgrx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
 
 
 def write_texture_shaders(params, config, shader_file):
     for name in config.TEXTURE_NAMES:
         for j in range(2):
-            shader_name = 'textures/wolf3d/{}__{}'.format(name, j)
+            shader_name = 'textures/{}/{}__{}'.format(params.short_name, name, j)
             path = shader_name + '.tga'
             shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
     palette = config.GRAPHICS_PALETTE
     for i in range(len(palette)):
-        shader_name = 'textures/wolf3d/palette_0x{:02X}.tga'.format(i)
+        shader_name = 'textures/{}/palette_0x{:02X}.tga'.format(params.short_name, i)
         path = shader_name + '.tga'
         shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
@@ -133,7 +132,7 @@ def export_shaders(params, config, zip_file):
 
     shader_text = io.StringIO()
     write_texture_shaders(params, config, shader_text)
-    zip_file.writestr('scripts/wolf3d.shader', shader_text.getvalue().encode())
+    zip_file.writestr('scripts/{}.shader'.format(params.short_name), shader_text.getvalue().encode())
 
     with open(os.path.join(params.output_folder, 'scripts', 'wolf3d.shader'), 'wt') as shader_file:
         shader_file.write(shader_text.getvalue())
@@ -154,11 +153,12 @@ def export_sprites(params, config, zip_file, vswap_chunks_handler):
 
     for i, sprite in enumerate(sprite_manager):
         name = config.SPRITE_NAMES[i]
-        path = 'sprites/{}.tga'.format(name)
+        path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         logger.info('Sprite [%d/%d]: %r', (i + 1), count, path)
-        pixels_abgr = bytes(x for pixel in sprite.image.convert('RGBA').getdata() for x in reversed(pixel))
+        pixels_bgra = bytes(x for pixel in sprite.image.convert('RGBA').getdata()
+                            for x in [pixel[2], pixel[1], pixel[0], pixel[3]])
         sprite_stream = io.BytesIO()
-        write_targa_rgbx(sprite_stream, config.SPRITE_DIMENSIONS, 32, pixels_abgr)
+        write_targa_bgrx(sprite_stream, config.SPRITE_DIMENSIONS, 32, pixels_bgra)
         zip_file.writestr(path, sprite_stream.getvalue())
 
 
@@ -185,10 +185,28 @@ def export_fonts(params, config, zip_file, graphics_chunks_handler):
 
         pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
         font_stream = io.BytesIO()
-        write_targa_rgbx(font_stream, (256, 256), 24, pixels_bgr)
+        write_targa_bgrx(font_stream, (256, 256), 24, pixels_bgr)
         zip_file.writestr(path, font_stream.getvalue())
 
         # TODO: *.dat file
+
+
+def export_pictures(params, config, zip_file, graphics_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting pictures')
+
+    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    palette_map = config.GRAPHICS_PALETTE_MAP
+    start, count = partitions_map['pics']
+    picture_manager = pywolf.graphics.PictureManager(graphics_chunks_handler, palette_map, start, count)
+
+    for i, picture in enumerate(picture_manager):
+        path = 'gfx/{}/{}.tga'.format(params.short_name, config.PICTURE_NAMES[i])
+        logger.info('Picture [%d/%d]: %r', (i + 1), count, path)
+        pixels_bgr = bytes(x for pixel in picture.image.convert('RGB').getdata() for x in reversed(pixel))
+        picture_stream = io.BytesIO()
+        write_targa_bgrx(picture_stream, picture.dimensions, 24, pixels_bgr)
+        zip_file.writestr(path, picture_stream.getvalue())
 
 
 def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
@@ -200,73 +218,36 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
     sample_manager = pywolf.audio.SampledSoundManager(vswap_chunks_handler,
                                                       config.SAMPLED_SOUNDS_FREQUENCY,
                                                       start, count)
-    scale_factor = params.wave_frequency / config.SAMPLED_SOUNDS_FREQUENCY
+    scale_factor = params.wave_rate / config.SAMPLED_SOUNDS_FREQUENCY
 
     for i, sound in enumerate(sample_manager):
         name = config.SAMPLED_SOUND_NAMES[i]
-        path = 'sound/sampled/{}.wav'.format(name)
+        path = 'sound/{}/sampled/{}.wav'.format(params.short_name, name)
         logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
         samples = bytes(samples_upsample(sound.samples, scale_factor))
         wave_file = io.BytesIO()
-        wave_write(wave_file, params.wave_frequency, samples)
+        wave_write(wave_file, params.wave_rate, samples)
         zip_file.writestr(path, wave_file.getbuffer())
-
-
-def convert_imf_chunk_to_wave_file(params, imf_chunk):
-    imf2wav_path = params.imf2wav_path
-    imf_frequency = params.imf_frequency
-    wave_frequency = params.wave_frequency
-    chunk_path = ''
-    wave_path = ''
-    tempdir_path = tempfile.gettempdir()
-    PIPE = subprocess.PIPE
-
-    try:
-        with tempfile.NamedTemporaryFile('wb', delete=False) as chunk_file:
-            chunk_file.write(imf_chunk)
-        chunk_path = os.path.join(tempdir_path, chunk_file.name)
-
-        with tempfile.NamedTemporaryFile('wb', delete=False) as wave_file:
-            pass
-        wave_path = os.path.join(tempdir_path, wave_file.name)
-
-        args = [imf2wav_path, chunk_path, wave_path, str(imf_frequency), str(wave_frequency)]
-        subprocess.Popen(args, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE).communicate()
-
-        return wave_path
-
-    except:
-        try:
-            os.unlink(wave_path)
-        except:
-            pass
-        raise
-
-    finally:
-        try:
-            os.unlink(chunk_path)
-        except:
-            pass
 
 
 def export_musics(params, config, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting musics')
 
-    start, count = config.SOUNDS_PARTITIONS_MAP['music']
+    start, count = config.AUDIO_PARTITIONS_MAP['music']
 
     for i in range(count):
         chunk_index = start + i
         name = config.MUSIC_NAMES[i]
-        path = 'music/{}.wav'.format(name)
+        path = 'music/{}/{}.wav'.format(params.short_name, name)
         logger.info('Music [%d/%d]: %r', (i + 1), count, path)
         imf_chunk = audio_chunks_handler[chunk_index]
-        wave_path = convert_imf_chunk_to_wave_file(params, imf_chunk)
+        wave_path = convert_imf_to_wave(imf_chunk, params.imf2wav_path,
+                                        wave_rate=params.wave_rate, imf_rate=params.imf_rate)
         try:
             with open(wave_path, 'rb') as wave_file:
                 wave_samples = wave_file.read()
             zip_file.writestr(path, wave_samples)
-
         finally:
             try:
                 os.unlink(wave_path)
@@ -278,20 +259,20 @@ def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting AdLib sounds')
 
-    start, count = config.SOUNDS_PARTITIONS_MAP['adlib']
+    start, count = config.AUDIO_PARTITIONS_MAP['adlib']
+    adlib_manager = pywolf.audio.AdLibSoundManager(audio_chunks_handler, start, count)
 
-    for i in range(count):
-        chunk_index = start + i
-        name = i  # FIXME: config.ADLIB_SOUND_NAMES[i]
-        path = 'sound/adlib/{}.wav'.format(name)
+    for i, sound in enumerate(adlib_manager):
+        name = config.ADLIB_SOUND_NAMES[i]
+        path = 'sound/{}/adlib/{}.wav'.format(params.short_name, name)
         logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
-        imf_chunk = audio_chunks_handler[chunk_index]
-        wave_path = convert_imf_chunk_to_wave_file(params, imf_chunk)
+        imf_chunk = sound.to_imf_chunk()
+        wave_path = convert_imf_to_wave(imf_chunk, params.imf2wav_path,
+                                        wave_rate=params.wave_rate, imf_rate=params.imf_rate)
         try:
             with open(wave_path, 'rb') as wave_file:
                 wave_samples = wave_file.read()
             zip_file.writestr(path, wave_samples)
-
         finally:
             try:
                 os.unlink(wave_path)
@@ -303,19 +284,19 @@ def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting buzzer sounds')
 
-    start, count = config.SOUNDS_PARTITIONS_MAP['buzzer']
+    start, count = config.AUDIO_PARTITIONS_MAP['buzzer']
     buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start, count)
 
     for i, sound in enumerate(buzzer_manager):
-        name = i  # FIXME: config.BUZZER_SOUND_NAMES[i]
-        path = 'sound/buzzer/{}.wav'.format(name)
-        logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
+        name = config.BUZZER_SOUND_NAMES[i]
+        path = 'sound/{}/buzzer/{}.wav'.format(params.short_name, name)
+        logger.info('Buzzer sound [%d/%d]: %r', (i + 1), count, path)
         wave_file = io.BytesIO()
-        sound.wave_write(wave_file, params.wave_frequency)
+        sound.wave_write(wave_file, params.wave_rate)
         zip_file.writestr(path, wave_file.getbuffer())
 
 
-def main(*args):  # TODO
+def main(*args):
     logger = logging.getLogger()
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.DEBUG)
@@ -353,12 +334,12 @@ def main(*args):  # TODO
         export_textures(params, config, zip_file, vswap_chunks_handler)
         export_sprites(params, config, zip_file, vswap_chunks_handler)
         export_fonts(params, config, zip_file, graphics_chunks_handler)
-        # TODO: export_pictures(params, config, zip_file, graphics_chunks_handler)
+        export_pictures(params, config, zip_file, graphics_chunks_handler)
         # TODO: export_tile8(params, config, zip_file, graphics_chunks_handler)
 
         export_sampled_sounds(params, config, zip_file, vswap_chunks_handler)
         export_musics(params, config, zip_file, audio_chunks_handler)
-        # TODO: export_adlib_sounds(params, config, zip_file, audio_chunks_handler)
+        export_adlib_sounds(params, config, zip_file, audio_chunks_handler)
         export_buzzer_sounds(params, config, zip_file, audio_chunks_handler)
 
         # TODO: export_maps(params, config, zip_file, map_chunks_handler)
@@ -366,7 +347,7 @@ def main(*args):  # TODO
 
         # TODO: export_texts(params, config, zip_file, ?)
 
-    pass
+        pass
 
 
 if __name__ == '__main__':

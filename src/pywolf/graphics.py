@@ -112,7 +112,7 @@ def jascpal_write(stream, palette):
         stream_write(stream, '{:d} {:d} {:d}\n'.format(r, g, b))
 
 
-def write_targa_rgbx(stream, dimensions, depth_bits, pixels_xbgr):
+def write_targa_bgrx(stream, dimensions, depth_bits, pixels_bgrx):
     stream_pack(stream, '<BBBHHBHHHHBB',
                 0, #  id_length
                 0,  # colormap_type
@@ -126,7 +126,7 @@ def write_targa_rgbx(stream, dimensions, depth_bits, pixels_xbgr):
                 dimensions[1], # height
                 depth_bits,  # pixel_size: 24|32
                 0x20)  # attributes: top-down
-    stream_write(stream, pixels_xbgr)
+    stream_write(stream, pixels_bgrx)
 
 
 def build_color_image(dimensions, color):
