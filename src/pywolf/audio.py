@@ -226,7 +226,7 @@ class BuzzerSoundManager(ResourceManager):
 
 class AdLibSoundHeader(object):
 
-    SIZE = struct.calcsize('<LH17B')
+    SIZE = struct.calcsize('<LH13B3sB')
 
     def __init__(self,
                  length, priority,
@@ -266,14 +266,12 @@ class AdLibSoundHeader(object):
     @classmethod
     def from_bytes(cls, data, offset=0):
         args = struct.unpack_from('<LH13B', data, offset)
-        offset += struct.calcsize('<LH13B')
-        struct.unpack_from('<3B', data, offset)  # unused
-        offset += struct.calcsize('<3B')
+        offset += struct.calcsize('<LH13B3s')
         args += stream_unpack('<B', data, offset)
         return cls(*args)
 
     def to_bytes(self):
-        return struct.pack('<LH17B',
+        return struct.pack('<LH13B3sB',
                            self.length,
                            self.priority,
                            self.modulator_char,
@@ -289,7 +287,7 @@ class AdLibSoundHeader(object):
                            self.conn,
                            self.voice,
                            self.mode,
-                           0, 0, 0,
+                           b'',
                            self.block)
 
     def to_imf_chunk(self, length=None, which=0, old_muse_compatibility=False):
@@ -340,7 +338,7 @@ class AdLibSound(object):
     def __getitem__(self, key):
         return self.events[key]
 
-    def to_imf_chunk(self, delay=5, which=0, old_muse_compatibility=False):
+    def to_imf_chunk(self, delay_cycles=5, which=0, old_muse_compatibility=False):
         events = self.events
         header = self.header
         metadata = self.metadata
@@ -350,24 +348,24 @@ class AdLibSound(object):
             freq_l_reg = ADLIB_REG_FREQ_L + modulator
             freq_h_reg = ADLIB_REG_FREQ_H + modulator
             block = ((header.block & 7) << 2) | 0x20
-            block_on_data = struct.pack('<BBH', freq_h_reg, block, delay)
-            block_off_data = struct.pack('<BBH', freq_h_reg, 0x00, delay)
+            key_on_data = struct.pack('<BBH', freq_h_reg, block, delay_cycles)
+            key_off_data = struct.pack('<BBH', freq_h_reg, 0x00, delay_cycles)
 
             events_data = []
             for event in events:
                 if event:
                     events_data.append(struct.pack('<BBH', freq_l_reg, event, 0))
-                    events_data.append(block_on_data)
+                    events_data.append(key_on_data)
                 else:
-                    events_data.append(block_off_data)
-            events_data.append(block_off_data)
+                    events_data.append(key_off_data)
+            events_data.append(key_off_data)
 
-            header_data = header.to_imf_chunk(len(events_data), which, old_muse_compatibility)
-            imf_chunk = b''.join([header_data] + events_data + [metadata])
+            setup_data = header.to_imf_chunk(len(events_data), which, old_muse_compatibility)
+            imf_chunk = b''.join([setup_data] + events_data + [metadata])
             return imf_chunk
         else:
-            header_data = header.to_imf_chunk(0, which, old_muse_compatibility)
-            return bytes(header_data)
+            setup_data = header.to_imf_chunk(0, which, old_muse_compatibility)
+            return bytes(setup_data)
 
     @classmethod
     def from_stream(cls, stream):
