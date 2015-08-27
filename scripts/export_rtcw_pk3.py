@@ -15,20 +15,22 @@ from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave
 import pywolf.configs.wl6 as CONFIG_WL6
 from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
+from pywolf.utils import stream_pack
 
 
 IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav.exe')
 
 
 TEXTURE_SHADER_TEMPLATE = '''
-{!s}
+{0!s}
 {{
+    qer_editorimage {1!s}
     {{
         map $lightmap
         rgbGen identity
     }}
     {{
-        map {!s}
+        clampmap {1!s}
         blendFunc GL_DST_COLOR GL_ZERO
         rgbGen identity
     }}
@@ -36,11 +38,17 @@ TEXTURE_SHADER_TEMPLATE = '''
 '''
 
 SPRITE_SHADER_TEMPLATE = '''
-{!s}
+{0!s}
 {{
+    qer_editorimage {1!s}
+    deformVertexes autoSprite2
+    surfaceparm trans
+    surfaceparm nomarks
+    surfaceparm nolightmap
+    cull none
     {{
-        map {!s}
-        blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+        clampmap {1!s}
+        blendFunc blend
         rgbGen identity
     }}
 }}
@@ -76,6 +84,11 @@ def build_argument_parser():
     return parser
 
 
+def _sep():
+    logger = logging.getLogger()
+    logger.info('-' * 80)
+
+
 def export_textures(params, config, zip_file, vswap_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting textures')
@@ -89,55 +102,67 @@ def export_textures(params, config, zip_file, vswap_chunks_handler):
 
     for i, texture in enumerate(texture_manager):
         name = config.TEXTURE_NAMES[i >> 1]
-        path = 'textures/{}/{}__{}.tga'.format(params.short_name, name, (i & 1))
+        path = 'textures/{}/walls/{}__{}.tga'.format(params.short_name, name, (i & 1))
         logger.info('Texture [%d/%d]: %r', (i + 1), count, path)
-        pixels_bgr = bytes(x for pixel in texture.image.convert('RGB').getdata() for x in reversed(pixel))
+        top_bottom_rgb_image = texture.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
+        pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
         write_targa_bgrx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
 
     palette = config.GRAPHICS_PALETTE
     for i, color in enumerate(palette):
-        path = 'textures/{}/palette_0x{:02X}.tga'.format(params.short_name, i)
-        logger.info('Texture palette color [%d/%d]: %r (0x%02X, 0x%02X, 0x%02X)',
+        path = 'textures/{}/palette/color_0x{:02X}.tga'.format(params.short_name, i)
+        logger.info('Texture palette color [%d/%d]: %r, (0x%02X, 0x%02X, 0x%02X)',
                     (i + 1), len(palette), path, *color)
         image = build_color_image(config.TEXTURE_DIMENSIONS, color)
-        pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
+        top_bottom_rgb_image = image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
+        pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
         write_targa_bgrx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
+
+    logger.info('Done')
+    _sep()
 
 
 def write_texture_shaders(params, config, shader_file):
     for name in config.TEXTURE_NAMES:
         for j in range(2):
-            shader_name = 'textures/{}/{}__{}'.format(params.short_name, name, j)
+            shader_name = 'textures/{}/walls/{}__{}'.format(params.short_name, name, j)
             path = shader_name + '.tga'
             shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
     palette = config.GRAPHICS_PALETTE
     for i in range(len(palette)):
-        shader_name = 'textures/{}/palette_0x{:02X}.tga'.format(params.short_name, i)
+        shader_name = 'textures/{}/palette/color_0x{:02X}'.format(params.short_name, i)
         path = shader_name + '.tga'
         shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
 
 def write_sprite_shaders(params, config, shader_file):
-    pass  # TODO
+    for name_index in config.STATIC_SPRITE_INDICES:
+        name = config.SPRITE_NAMES[name_index]
+        shader_name = 'textures/{}/static_sprites/{}'.format(params.short_name, name)
+        path = 'sprites/{}/{}.tga'.format(params.short_name, name)
+        shader_file.write(SPRITE_SHADER_TEMPLATE.format(shader_name, path))
 
 
 def export_shaders(params, config, zip_file):
     logger = logging.getLogger()
     logger.info('Exporting shaders')
 
-    shader_text = io.StringIO()
-    write_texture_shaders(params, config, shader_text)
-    zip_file.writestr('scripts/{}.shader'.format(params.short_name), shader_text.getvalue().encode())
+    shader_text_stream = io.StringIO()
+    # write_texture_shaders(params, config, shader_text_stream)  # FIXME: really needed for them?
+    write_sprite_shaders(params, config, shader_text_stream)
+    zip_file.writestr('scripts/{}.shader'.format(params.short_name),
+                      shader_text_stream.getvalue().encode())
 
     with open(os.path.join(params.output_folder, 'scripts', 'wolf3d.shader'), 'wt') as shader_file:
-        shader_file.write(shader_text.getvalue())
+        shader_file.write(shader_text_stream.getvalue())
 
-    # TODO: sprites
+    logger.info('Done')
+    _sep()
 
 
 def export_sprites(params, config, zip_file, vswap_chunks_handler):
@@ -155,16 +180,23 @@ def export_sprites(params, config, zip_file, vswap_chunks_handler):
         name = config.SPRITE_NAMES[i]
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         logger.info('Sprite [%d/%d]: %r', (i + 1), count, path)
-        pixels_bgra = bytes(x for pixel in sprite.image.convert('RGBA').getdata()
+        top_bottom_rgba_image = sprite.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGBA')
+        pixels_bgra = bytes(x for pixel in top_bottom_rgba_image.getdata()
                             for x in [pixel[2], pixel[1], pixel[0], pixel[3]])
         sprite_stream = io.BytesIO()
         write_targa_bgrx(sprite_stream, config.SPRITE_DIMENSIONS, 32, pixels_bgra)
-        zip_file.writestr(path, sprite_stream.getvalue())
+        zip_file.writestr(path, sprite_stream.getbuffer())
+
+    logger.info('Done')
+    _sep()
 
 
-def export_fonts(params, config, zip_file, graphics_chunks_handler):
+# TODO: compact+paged glyph placement
+def export_fonts(params, config, zip_file, graphics_chunks_handler, missing_char='?',
+                 texture_dimensions=(256, 256)):
+
     logger = logging.getLogger()
-    logger.info('Exporting sprites')
+    logger.info('Exporting fonts')
 
     partitions_map = config.GRAPHICS_PARTITIONS_MAP
     palette = config.GRAPHICS_PALETTE_MAP[...]
@@ -172,23 +204,55 @@ def export_fonts(params, config, zip_file, graphics_chunks_handler):
     font_manager = pywolf.graphics.FontManager(graphics_chunks_handler, palette, start, count)
 
     for i, font in enumerate(font_manager):
-        assert font.height * 16 <= 256
-        path = 'fonts/fontImage_0_{}.tga'.format(font.height)
-        logger.info('Font [%d/%d]: %r', (i + 1), count, path)
-        assert max(font.widths) * 16 <= 256
-        image = Image.new('RGB', (256, 256))
+        height = font.height
+        assert texture_dimensions == (256, 256)
+        assert max(font.widths) * 16 <= texture_dimensions[0]
+        assert height * 16 <= texture_dimensions[1]
+        image_path = 'fonts/fontImage_0_{}.tga'.format(height)
+        info_path = 'fonts/fontImage_{}.dat'.format(height)
+        logger.info('Font [%d/%d]: %r, %r', (i + 1), count, image_path, info_path)
+        image = Image.new('RGB', texture_dimensions)
+        info_stream = io.BytesIO()
+        image_path_ascii = image_path.encode('ascii')
 
         for j, glyph_image in enumerate(font.images):
+            if glyph_image is None and missing_char is not None:
+                glyph_image = font.images[ord(missing_char)]
+                width = font.widths[ord(missing_char)]
+            else:
+                width = font.widths[j]
+            origin = (((j % 16) * 16), ((j // 16) * 16))
+
             if glyph_image is not None:
-                corner = ((j % 16) * 16, (j // 16) * 16)
-                image.paste(glyph_image, corner)
+                image.paste(glyph_image, origin)
 
-        pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
+            stream_pack(info_stream, '<7l4fL32s',
+                        height,  # height
+                        0,  # top
+                        height,  # bottom
+                        width,  # pitch
+                        width,  # xSkip
+                        width,  # imageWidth
+                        height,  # imageHeight
+                        (origin[0] / texture_dimensions[0]),  # s
+                        (origin[1] / texture_dimensions[1]),  # t
+                        ((origin[0] + width) / texture_dimensions[0]),  # s2
+                        ((origin[1] + height) / texture_dimensions[1]),  # t2
+                        0,  # glyph
+                        image_path_ascii)  # shaderName
+
+        stream_pack(info_stream, '<f64s',
+                    1.0,  # glyphScale
+                    info_path.encode('ascii'))  # name
+        zip_file.writestr(info_path, info_stream.getbuffer())
+
+        pixels_bgr = bytes(x for pixel in image.transpose(Image.FLIP_TOP_BOTTOM).getdata() for x in reversed(pixel))
         font_stream = io.BytesIO()
-        write_targa_bgrx(font_stream, (256, 256), 24, pixels_bgr)
-        zip_file.writestr(path, font_stream.getvalue())
+        write_targa_bgrx(font_stream, texture_dimensions, 24, pixels_bgr)
+        zip_file.writestr(image_path, font_stream.getbuffer())
 
-        # TODO: *.dat file
+    logger.info('Done')
+    _sep()
 
 
 def export_pictures(params, config, zip_file, graphics_chunks_handler):
@@ -203,10 +267,36 @@ def export_pictures(params, config, zip_file, graphics_chunks_handler):
     for i, picture in enumerate(picture_manager):
         path = 'gfx/{}/{}.tga'.format(params.short_name, config.PICTURE_NAMES[i])
         logger.info('Picture [%d/%d]: %r', (i + 1), count, path)
-        pixels_bgr = bytes(x for pixel in picture.image.convert('RGB').getdata() for x in reversed(pixel))
+        top_bottom_rgb_image = picture.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
+        pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
         picture_stream = io.BytesIO()
         write_targa_bgrx(picture_stream, picture.dimensions, 24, pixels_bgr)
-        zip_file.writestr(path, picture_stream.getvalue())
+        zip_file.writestr(path, picture_stream.getbuffer())
+
+    logger.info('Done')
+    _sep()
+
+
+def export_tile8(params, config, zip_file, graphics_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting tile8')
+
+    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    palette_map = config.GRAPHICS_PALETTE_MAP
+    start, count = partitions_map['tile8']
+    tile8_manager = pywolf.graphics.Tile8Manager(graphics_chunks_handler, palette_map, start, count)
+
+    for i, tile8 in enumerate(tile8_manager):
+        path = 'gfx/{}/tile8__{}.tga'.format(params.short_name, config.TILE8_NAMES[i])
+        logger.info('Tile8 [%d/%d]: %r', (i + 1), count, path)
+        top_bottom_rgb_image = tile8.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
+        pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
+        tile8_stream = io.BytesIO()
+        write_targa_bgrx(tile8_stream, tile8.dimensions, 24, pixels_bgr)
+        zip_file.writestr(path, tile8_stream.getbuffer())
+
+    logger.info('Done')
+    _sep()
 
 
 def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
@@ -228,6 +318,9 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
         wave_file = io.BytesIO()
         wave_write(wave_file, params.wave_rate, samples)
         zip_file.writestr(path, wave_file.getbuffer())
+
+    logger.info('Done')
+    _sep()
 
 
 def export_musics(params, config, zip_file, audio_chunks_handler):
@@ -254,6 +347,9 @@ def export_musics(params, config, zip_file, audio_chunks_handler):
             except:
                 pass
 
+    logger.info('Done')
+    _sep()
+
 
 def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
@@ -279,6 +375,9 @@ def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
             except:
                 pass
 
+    logger.info('Done')
+    _sep()
+
 
 def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
@@ -295,6 +394,9 @@ def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
         sound.wave_write(wave_file, params.wave_rate)
         zip_file.writestr(path, wave_file.getbuffer())
 
+    logger.info('Done')
+    _sep()
+
 
 def main(*args):
     logger = logging.getLogger()
@@ -306,48 +408,75 @@ def main(*args):
     parser = build_argument_parser()
     params = parser.parse_args(args)
 
+    # TODO: print params
+    logger.info('Command-line parameters:')
+    for key, value in sorted(params.__dict__.items()):
+        logger.info('%s = %r', key, value)
+    _sep()
+
     config = CONFIG_WL6  # TODO: import from XML?
 
+    vswap_data_path = os.path.join(params.input_folder, params.vswap_data)
+    logger.info('Precaching VSwap chunks: <data>=%r', vswap_data_path)
     vswap_chunks_handler = pywolf.persistence.PrecachedVSwapChunksHandler()
-    with open(os.path.join(params.input_folder, params.vswap_data), 'rb') as data_file:
+    with open(vswap_data_path, 'rb') as data_file:
         vswap_chunks_handler.load(data_file)
+    _sep()
 
+    audio_data_path = os.path.join(params.input_folder, params.audio_data)
+    audio_header_path = os.path.join(params.input_folder, params.audio_header)
+    logger.info('Precaching audio chunks: <data>=%r, <header>=%r', audio_data_path, audio_header_path)
     audio_chunks_handler = pywolf.persistence.PrecachedAudioChunksHandler()
-    with open(os.path.join(params.input_folder, params.audio_header), 'rb') as (header_file
-    ),   open(os.path.join(params.input_folder, params.audio_data), 'rb') as data_file:
+    with open(audio_data_path, 'rb') as (data_file
+    ),   open(audio_header_path, 'rb') as header_file:
         audio_chunks_handler.load(data_file, header_file)
+    _sep()
 
+    graphics_data_path = os.path.join(params.input_folder, params.graphics_data)
+    graphics_header_path = os.path.join(params.input_folder, params.graphics_header)
+    graphics_huffman_path = os.path.join(params.input_folder, params.graphics_huffman)
+    logger.info('Precaching graphics chunks: <data>=%r, <header>=%r, <huffman>=%r',
+                graphics_data_path, graphics_header_path, graphics_huffman_path)
     graphics_chunks_handler = pywolf.persistence.PrecachedGraphicsChunksHandler()
-    with open(os.path.join(params.input_folder, params.graphics_header), 'rb') as (header_file
-    ),   open(os.path.join(params.input_folder, params.graphics_data), 'rb') as (data_file
-    ),   open(os.path.join(params.input_folder, params.graphics_huffman), 'rb') as huffman_file:
+    with open(graphics_data_path, 'rb') as (data_file
+    ),   open(graphics_header_path, 'rb') as (header_file
+    ),   open(graphics_huffman_path, 'rb') as huffman_file:
         graphics_chunks_handler.load(data_file, header_file, huffman_file,
                                      config.GRAPHICS_PARTITIONS_MAP)
+    _sep()
 
+    maps_data_path = os.path.join(params.input_folder, params.maps_data)
+    maps_header_path = os.path.join(params.input_folder, params.maps_header)
+    logger.info('Precaching map chunks: <data>=%r, <header>=%r', maps_data_path, maps_header_path)
     map_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
-    with open(os.path.join(params.input_folder, params.maps_header), 'rb') as (header_file
-    ),   open(os.path.join(params.input_folder, params.maps_data), 'rb') as data_file:
+    with open(maps_data_path, 'rb') as (data_file
+    ),   open(maps_header_path, 'rb') as header_file:
         map_chunks_handler.load(data_file, header_file)
+    _sep()
 
-    with zipfile.ZipFile(os.path.join(params.output_folder, params.output_pk3), 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        export_shaders(params, config, zip_file)
-        export_textures(params, config, zip_file, vswap_chunks_handler)
-        export_sprites(params, config, zip_file, vswap_chunks_handler)
-        export_fonts(params, config, zip_file, graphics_chunks_handler)
-        export_pictures(params, config, zip_file, graphics_chunks_handler)
-        # TODO: export_tile8(params, config, zip_file, graphics_chunks_handler)
+    pk3_path = os.path.join(params.output_folder, params.output_pk3)
+    logger.info('Creating PK3 (ZIP/deflated) file: %r', pk3_path)
+    with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:
+        _sep()
+        export_shaders(params, config, pk3_file)
+        export_textures(params, config, pk3_file, vswap_chunks_handler)
+        export_sprites(params, config, pk3_file, vswap_chunks_handler)
+        export_fonts(params, config, pk3_file, graphics_chunks_handler)
+        export_pictures(params, config, pk3_file, graphics_chunks_handler)
+        export_tile8(params, config, pk3_file, graphics_chunks_handler)
+        # TODO: export_texts(params, config, pk3_file, ?)
 
-        export_sampled_sounds(params, config, zip_file, vswap_chunks_handler)
-        export_musics(params, config, zip_file, audio_chunks_handler)
-        export_adlib_sounds(params, config, zip_file, audio_chunks_handler)
-        export_buzzer_sounds(params, config, zip_file, audio_chunks_handler)
+        export_sampled_sounds(params, config, pk3_file, vswap_chunks_handler)
+#XXX        export_musics(params, config, pk3_file, audio_chunks_handler)
+        export_adlib_sounds(params, config, pk3_file, audio_chunks_handler)
+        export_buzzer_sounds(params, config, pk3_file, audio_chunks_handler)
 
-        # TODO: export_maps(params, config, zip_file, map_chunks_handler)
-        # TODO: export_models(params, config, zip_file, ?)
+        # TODO: export_maps(params, config, pk3_file, map_chunks_handler)
+        # TODO: export_models(params, config, pk3_file, ?)
 
-        # TODO: export_texts(params, config, zip_file, ?)
+        pass  # TODO: remove line
 
-        pass
+    logger.info('PK3 archived successfully')
 
 
 if __name__ == '__main__':

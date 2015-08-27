@@ -132,6 +132,11 @@ class Test(unittest.TestCase):
                     if image is not None:
                         image.save(r'./outputs/font_{}_{}.png'.format(i, j))
 
+    def testScreens(self):
+        pass  # TODO
+
+    def testTexts(self):
+        pass  # TODO
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

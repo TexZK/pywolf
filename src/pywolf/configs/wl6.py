@@ -303,6 +303,8 @@ GRAPHICS_PALETTE_MAP = {
     ...: rgbpalette_flatten(GRAPHICS_PALETTE)
 }
 
+TILE8_NAMES = [str(i) for i in range(GRAPHICS_PARTITIONS_MAP['tile8'][1])]  # TODO
+
 PICTURE_LABELS = (
     'H_BJPIC',
     'H_CASTLEPIC',
@@ -1427,6 +1429,44 @@ SPRITE_NAMES = (
     'chaingun__attack_a2',
     'chaingun__attack_a3',
 )
+
+STATIC_SPRITE_INDICES = tuple(SPRITE_NAMES.index(name) for name in (
+    'water_pool',
+    'oil_drum',
+    'table__chairs',
+    'lamp',
+    'chandelier',
+    'hanging_skeleton',
+    'pillar',
+    'green_plant',
+    'skeleton',
+    'sink',
+    'brown_plant',
+    'vase',
+    'table',
+    'ceiling_light',
+    'utensils_brown',
+    'armor',
+    'cage',
+    'cage__skeleton',
+    'bones',
+    'bed',
+    'basket',
+    'bones__blood',
+    'barrel',
+    'well__water',
+    'well',
+    'blood_pool',
+    'flag',
+    'bones_1',
+    'bones_2',
+    'bones_3',
+    'bones_4',
+    'utensils_blue',
+    'stove',
+    'rack',
+    'vines',
+))
 
 
 AUDIO_PARTITIONS_MAP = {

@@ -116,7 +116,7 @@ def write_targa_bgrx(stream, dimensions, depth_bits, pixels_bgrx):
     stream_pack(stream, '<BBBHHBHHHHBB',
                 0, #  id_length
                 0,  # colormap_type
-                2,  # image_type: RGB(A)
+                2,  # image_type: BGR(A)
                 0,  # colormap_index
                 0,  # colormap_length
                 0,  # colormap_size
@@ -124,8 +124,8 @@ def write_targa_bgrx(stream, dimensions, depth_bits, pixels_bgrx):
                 0,  # y_origin
                 dimensions[0], # width
                 dimensions[1], # height
-                depth_bits,  # pixel_size: 24|32
-                0x20)  # attributes: top-down
+                depth_bits,  # pixel_size: 24 (BGR) | 32 (BGRA)
+                0x00)  # attributes
     stream_write(stream, pixels_bgrx)
 
 
@@ -182,10 +182,10 @@ class Tile8Manager(ResourceManager):
         palette_map = self._palette_map
         start = self._start
 
-        area = 8 * 8
+        dimensions = (8, 8)
+        area = dimensions[0] * dimensions[1]
         offset = index * area
         chunk = chunk[offset:(offset + area)]
-        dimensions = (8, 8)
         pixels = bytes(pixels_linearize(chunk, dimensions))
         palette = palette_map.get(start, palette_map[...])
         return Picture(dimensions, pixels, palette)
@@ -346,6 +346,7 @@ class FontManager(ResourceManager):
         header = FontHeader.from_stream(io.BytesIO(chunk))
         character_count = type(header).CHARACTER_COUNT
         height = header.height
+        assert 0 < height
         glyphs_pixels = [None] * character_count
 
         for i in range(character_count):
