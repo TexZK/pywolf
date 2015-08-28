@@ -264,7 +264,7 @@ class ResourceManager(object):
         return item
 
     def _build_resource(self, index, chunk):
-        raise NotImplementedError
+        return chunk
 
     def _destroy_resource(self, index):  # TODO: add support (here and into the cache)
         raise NotImplementedError

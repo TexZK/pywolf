@@ -21,6 +21,7 @@ class Test(unittest.TestCase):
         stdout_handler.setLevel(logging.DEBUG)
         logger.addHandler(stdout_handler)
         logger.setLevel(logging.DEBUG)
+        logger.info('-' * 80)
         self._stdout_handler = stdout_handler
 
     def tearDown(self):
@@ -35,8 +36,11 @@ class Test(unittest.TestCase):
         with open(r'../data/wl6/vswap.wl6', 'rb') as data_file:
             vswap_chunks_handler.load(data_file)
 
+        count = len(vswap_chunks_handler)
         for i, chunk in enumerate(vswap_chunks_handler):
-            with open(r'./outputs/vswap_{}.chunk'.format(i), 'wb') as chunk_file:
+            path = r'./outputs/vswap_{}.chunk'.format(i)
+            logger.info('VSwap chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
     def testAudio(self):
@@ -48,8 +52,11 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/audiot.wl6', 'rb') as data_file:
             audio_chunks_handler.load(data_file, header_file)
 
+        count = len(audio_chunks_handler)
         for i, chunk in enumerate(audio_chunks_handler):
-            with open(r'./outputs/audio_{}.chunk'.format(i), 'wb') as chunk_file:
+            path = r'./outputs/audio_{}.chunk'.format(i)
+            logger.info('Audio chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
     def testGraphics(self):
@@ -63,8 +70,11 @@ class Test(unittest.TestCase):
             graphics_chunks_handler.load(data_file, header_file, huffman_file,
                                          pywolf.configs.wl6.GRAPHICS_PARTITIONS_MAP)
 
+        count = len(graphics_chunks_handler)
         for i, chunk in enumerate(graphics_chunks_handler):
-            with open(r'./outputs/graphics_{}.chunk'.format(i), 'wb') as chunk_file:
+            path = r'./outputs/graphics_{}.chunk'.format(i)
+            logger.info('Graphics chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
     def testMap(self):
@@ -76,18 +86,26 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/gamemaps.wl6', 'rb') as data_file:
             map_chunks_handler.load(data_file, header_file)
 
+        count = len(map_chunks_handler)
         for i, item in enumerate(map_chunks_handler):
             header, planes = item
+            logger.info('Map chunk [%d/%d]:', (i + 1), count)
             if header is not None:
-                with open(r'./outputs/map_{}_header.chunk'.format(i), 'wb') as header_file:
-                    header.to_stream(header_file)
+                header_bytes = header.to_bytes()
+                path = r'./outputs/map_{}_header.chunk'.format(i)
+                logger.info('... header: %r, 0x%X', path, len(header_bytes))
+                with open(path, 'wb') as header_file:
+                    header_file.write(header_bytes)
+
                 for j, plane in enumerate(planes):
-                    with open(r'./outputs/map_{}_plane{}.chunk'.format(i, j), 'wb') as chunk_file:
+                    path = r'./outputs/map_{}_plane{}.chunk'.format(i, j)
+                    logger.info('... plane [%d/%d]: %r, 0x%X bytes', (j + 1), len(planes), path, len(plane))
+                    with open(path, 'wb') as chunk_file:
                         chunk_file.write(plane)
 
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
+    # import sys;sys.argv = ['', 'Test.testName']
     unittest.main()
 
 

@@ -21,7 +21,7 @@ GRAPHICS_PARTITIONS_MAP = {
     'screens':  (136,   2),
     'helpart':  (138,   1),
     'demos':    (139,   4),
-    'endarts':  (143,   6),
+    'endart':   (143,   6),
 }
 
 GRAPHICS_PALETTE = (

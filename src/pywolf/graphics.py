@@ -356,3 +356,28 @@ class FontManager(ResourceManager):
 
         return Font(height, header.widths, glyphs_pixels, palette, alpha_index)
 
+
+class DOSScreen(object):
+
+    def __init__(self, data):
+        self.data = data
+
+    # TODO: convert to image
+
+
+class DOSScreenManager(ResourceManager):
+
+    def _build_resource(self, index, chunk):
+        return DOSScreen(chunk)
+
+
+class HelpArtManager(ResourceManager):
+
+    def _build_resource(self, index, chunk):
+        return chunk.decode('ascii')
+
+
+class EndArtManager(ResourceManager):
+
+    def _build_resource(self, index, chunk):
+        return chunk.decode('ascii')

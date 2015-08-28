@@ -2,6 +2,8 @@
 @author: Andrea Zoppi
 '''
 
+import io
+
 from .utils import stream_pack, stream_pack_array, stream_unpack, stream_unpack_array
 
 
@@ -62,6 +64,15 @@ class MapHeader(object):
         stream_pack_array(data_stream, '<H', self.plane_sizes)
         stream_pack(data_stream, '<HH', self.width, self.height)
         stream_pack(data_stream, '<16s', self.name.encode('ascii'))
+
+    @classmethod
+    def from_bytes(cls, data, planes_count=3):
+        return cls.from_stream(io.BytesIO(data), planes_count)
+
+    def to_bytes(self):
+        data_stream = io.BytesIO()
+        self.to_stream(data_stream)
+        return data_stream.getvalue()
 
 
 class Map(object):
