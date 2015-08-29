@@ -1,3 +1,7 @@
+# TODO: create Exporter class(es)
+# TODO: break export loops into single item calls with wrapping loop
+# TODO: allow export to normal file, PK3 being an option (like with open(file_object|path))
+
 '''
 @author: Andrea Zoppi
 '''
@@ -44,7 +48,6 @@ SPRITE_SHADER_TEMPLATE = '''
     deformVertexes autoSprite2
     surfaceparm trans
     surfaceparm nomarks
-    surfaceparm nolightmap
     cull none
     {{
         clampmap {1!s}
@@ -52,7 +55,92 @@ SPRITE_SHADER_TEMPLATE = '''
         rgbGen identity
     }}
 }}
-'''  # TODO: sprite Z-axis freedom
+'''
+
+
+class MapExporter(object):  # TODO
+
+    NORTH  = 0
+    EAST   = 1
+    SOUTH  = 2
+    WEST   = 3
+    TOP    = 4
+    BOTTOM = 5
+
+    DIR_TO_DISPL = {
+        NORTH:  ( 0, -1,  0),
+        EAST:   ( 1,  0,  0),
+        SOUTH:  ( 0,  1,  0),
+        WEST:   (-1,  0,  0),
+        TOP:    ( 0,  0,  1),
+        BOTTOM: ( 0,  0, -1),
+    }
+
+    def __init__(self, params, config, tilemap):
+        self.params = params
+        self.config = config
+        self.tilemap = tilemap
+
+    def tile_to_unit_coords(self, tile_coords):
+        tile_units = self.params.tile_units
+        return [
+            (tile_coords[0] *  tile_units),
+            (tile_coords[1] * -tile_units),
+            0,
+        ]
+
+    def describe_textured_cube(self, tile_coords, face_textures, unit_offsets=(0, 0, 0)):
+        tile_units = self.params.tile_units
+        half_units = tile_units * 0.5
+        center = [offset + units + half_units
+                  for units, offset in zip(self.tile_to_unit_coords(tile_coords), unit_offsets)]
+        texture_scale = self.params.texture_scale
+        format_line = ('( {0[0]} {0[1]} {0[2]} ) '
+                       '( {1[0]} {1[1]} {1[2]} ) '
+                       '( {2[0[} {2[1]} {2[2]} ) '
+                       '{3} 0 0 0 {4} {4} 0 0 0').format
+
+        face_vertices = [
+            [
+                [(center[0] + half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] - half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] - half_units), (center[1] + half_units), (center[2] - half_units)],
+                [(center[0] + half_units), (center[1] + half_units), (center[2] - half_units)],
+            ],
+            [
+                [(center[0] + half_units), (center[1] - half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] + half_units), (center[2] - half_units)],
+                [(center[0] + half_units), (center[1] - half_units), (center[2] - half_units)],
+            ],
+            [
+                [(center[0] - half_units), (center[1] - half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] - half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] - half_units), (center[2] - half_units)],
+                [(center[0] - half_units), (center[1] - half_units), (center[2] - half_units)],
+            ],
+            [
+                [(center[0] - half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] - half_units), (center[1] - half_units), (center[2] + half_units)],
+                [(center[0] - half_units), (center[1] - half_units), (center[2] - half_units)],
+                [(center[0] - half_units), (center[1] + half_units), (center[2] - half_units)],
+            ],
+            [
+                [(center[0] - half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] + half_units), (center[2] + half_units)],
+                [(center[0] + half_units), (center[1] - half_units), (center[2] + half_units)],
+                [(center[0] - half_units), (center[1] - half_units), (center[2] + half_units)],
+            ],
+            [
+                [(center[0] + half_units), (center[1] + half_units), (center[2] - half_units)],
+                [(center[0] - half_units), (center[1] + half_units), (center[2] - half_units)],
+                [(center[0] - half_units), (center[1] - half_units), (center[2] - half_units)],
+                [(center[0] + half_units), (center[1] - half_units), (center[2] - half_units)],
+            ],
+        ]
+
+        return '\n'.join(format_line(vertices[0], vertices[1], vertices[2], shader_name, texture_scale)
+                         for shader_name, vertices in zip(face_textures, face_vertices))
 
 
 def build_argument_parser():
@@ -80,6 +168,8 @@ def build_argument_parser():
     group.add_argument('--wave-rate', default=44100, type=int)
     group.add_argument('--imf-rate', default=700, type=int)
     group.add_argument('--imf2wav-path', default=IMF2WAV_PATH)
+    group.add_argument('--tile-units', default=32, type=int)
+    group.add_argument('--texture-scale', default=1.5, type=float)
 
     return parser
 
@@ -299,6 +389,57 @@ def export_tile8(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
+def export_screens(params, config, zip_file, graphics_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting DOS screens')
+
+    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    start, count = partitions_map['screens']
+    screen_manager = pywolf.graphics.DOSScreenManager(graphics_chunks_handler, start, count)
+
+    for i, screen in enumerate(screen_manager):
+        path = 'texts/{}/screens/{}.scr'.format(params.short_name, config.SCREEN_NAMES[i])
+        logger.info('DOS Screen [%d/%d]: %r', (i + 1), count, path)
+        zip_file.writestr(path, screen.data)
+
+    logger.info('Done')
+    _sep()
+
+
+def export_helparts(params, config, zip_file, graphics_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting HelpArt texts')
+
+    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    start, count = partitions_map['helpart']
+    helpart_manager = pywolf.graphics.HelpArtManager(graphics_chunks_handler, start, count)
+
+    for i, helpart in enumerate(helpart_manager):
+        path = 'texts/{}/helpart/helpart_{}.txt'.format(params.short_name, i)
+        logger.info('HelpArt [%d/%d]: %r', (i + 1), count, path)
+        zip_file.writestr(path, helpart.encode('ascii'))
+
+    logger.info('Done')
+    _sep()
+
+
+def export_endarts(params, config, zip_file, graphics_chunks_handler):
+    logger = logging.getLogger()
+    logger.info('Exporting EndArt texts')
+
+    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    start, count = partitions_map['endart']
+    endart_manager = pywolf.graphics.EndArtManager(graphics_chunks_handler, start, count)
+
+    for i, endart in enumerate(endart_manager):
+        path = 'texts/{}/endart/endart_{}.txt'.format(params.short_name, i)
+        logger.info('EndArt [%d/%d]: %r', (i + 1), count, path)
+        zip_file.writestr(path, endart.encode('ascii'))
+
+    logger.info('Done')
+    _sep()
+
+
 def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting sampled sounds')
@@ -306,9 +447,9 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
     start = vswap_chunks_handler.sounds_start
     count = len(vswap_chunks_handler.sounds_infos)
     sample_manager = pywolf.audio.SampledSoundManager(vswap_chunks_handler,
-                                                      config.SAMPLED_SOUNDS_FREQUENCY,
+                                                      config.SAMPLED_SOUND_FREQUENCY,
                                                       start, count)
-    scale_factor = params.wave_rate / config.SAMPLED_SOUNDS_FREQUENCY
+    scale_factor = params.wave_rate / config.SAMPLED_SOUND_FREQUENCY
 
     for i, sound in enumerate(sample_manager):
         name = config.SAMPLED_SOUND_NAMES[i]
@@ -408,7 +549,6 @@ def main(*args):
     parser = build_argument_parser()
     params = parser.parse_args(args)
 
-    # TODO: print params
     logger.info('Command-line parameters:')
     for key, value in sorted(params.__dict__.items()):
         logger.info('%s = %r', key, value)
@@ -464,10 +604,12 @@ def main(*args):
         export_fonts(params, config, pk3_file, graphics_chunks_handler)
         export_pictures(params, config, pk3_file, graphics_chunks_handler)
         export_tile8(params, config, pk3_file, graphics_chunks_handler)
-        # TODO: export_texts(params, config, pk3_file, ?)
+        export_screens(params, config, pk3_file, graphics_chunks_handler)
+        export_helparts(params, config, pk3_file, graphics_chunks_handler)
+        export_endarts(params, config, pk3_file, graphics_chunks_handler)
 
         export_sampled_sounds(params, config, pk3_file, vswap_chunks_handler)
-#XXX        export_musics(params, config, pk3_file, audio_chunks_handler)
+        export_musics(params, config, pk3_file, audio_chunks_handler)
         export_adlib_sounds(params, config, pk3_file, audio_chunks_handler)
         export_buzzer_sounds(params, config, pk3_file, audio_chunks_handler)
 

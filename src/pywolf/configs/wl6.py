@@ -512,6 +512,7 @@ TEXTURE_NAMES = (  # index // 2
     'elevator_door__horizontal',
 )
 
+
 SPRITE_DIMENSIONS = (64, 64)
 
 SPRITE_LABELS = (
@@ -1005,7 +1006,7 @@ SPRITE_NAMES = (
     'machinegun',
     'chaingun',
     'cross',
-    'chalace',
+    'chalice',
     'jewels',
     'crown',
     'extra_life',
@@ -1396,10 +1397,10 @@ SPRITE_NAMES = (
     'fettgesicht__death_a2',
     'fettgesicht__dead',
 
-    'bj__walk_a0',
-    'bj__walk_a1',
-    'bj__walk_a2',
-    'bj__walk_a3',
+    'bj__run_a0',
+    'bj__run_a1',
+    'bj__run_a2',
+    'bj__run_a3',
     'bj__jump_a0',
     'bj__jump_a1',
     'bj__jump_a2',
@@ -1469,6 +1470,12 @@ STATIC_SPRITE_INDICES = tuple(SPRITE_NAMES.index(name) for name in (
 ))
 
 
+SCREEN_NAMES = (
+    'exit',
+    'error',
+)
+
+
 AUDIO_PARTITIONS_MAP = {
     'buzzer':   (  0,  87),
     'adlib':    ( 87,  87),
@@ -1476,121 +1483,7 @@ AUDIO_PARTITIONS_MAP = {
     'music':    (261,  27),
 }
 
-
-SAMPLED_SOUNDS_FREQUENCY = 7042
-
-SAMPLED_SOUND_NAMES = (
-    'guard__wake',
-    'dog__wake',
-    'door__close',
-    'door__open',
-    'machinegun__attack',
-    'pistol__attack',
-    'chaingun__attack',
-    'ss__wake',
-    'hans__wake',
-    'hans__death',
-    'boss_gun__attack',
-    'ss__attack',
-    'guard__death_1',
-    'guard__death_2',
-    'guard__death_3',
-    'pushwall__move',
-    'dog__death',
-    'mutant__death',
-    'hitler__wake',
-    'hitler__death',
-    'ss__death',
-    'guard__attack',
-    'blood__slurpie',
-    'robed_fake__wake',
-    'schabbs__death',
-    'schabbs__wake',
-    'robed_fake__death',
-    'officer__wake',
-    'officer__death',
-    'dog__attack',
-    'elevator__use',
-    'mecha_hitler__step',
-    'bj__yeah',
-    'mecha_hitler__death',
-    'guard__death_4',
-    'guard__death_5',
-    'otto__death',
-    'otto__wake',
-    'fettgesicht__wake',
-    'secret__death',
-    'guard__death_6',
-    'guard__death_7',
-    'guard__death_8',
-    'gretel__wake',
-    'gretel__death',
-    'fettgesicht__death',
-)
-
-
-MUSIC_LABELS = (
-    'CORNER_MUS',
-    'DUNGEON_MUS',
-    'WARMARCH_MUS',
-    'GETTHEM_MUS',
-    'HEADACHE_MUS',
-    'HITLWLTZ_MUS',
-    'INTROCW3_MUS',
-    'NAZI_NOR_MUS',
-    'NAZI_OMI_MUS',
-    'POW_MUS',
-    'SALUTE_MUS',
-    'SEARCHN_MUS',
-    'SUSPENSE_MUS',
-    'VICTORS_MUS',
-    'WONDERIN_MUS',
-    'FUNKYOU_MUS',
-    'ENDLEVEL_MUS',
-    'GOINGAFT_MUS',
-    'PREGNANT_MUS',
-    'ULTIMATE_MUS',
-    'NAZI_RAP_MUS',
-    'ZEROHOUR_MUS',
-    'TWELFTH_MUS',
-    'ROSTER_MUS',
-    'URAHERO_MUS',
-    'VICMARCH_MUS',
-    'PACMAN_MUS',
-)
-
-MUSIC_NAMES = (
-    'Enemy Around the Corner',
-    'Into the Dungeons',
-    'The March to War',
-    'Get Them Before They Get You',
-    'Pounding Headache',
-    'Hitler Waltz',
-    'Kill the S.O.B.',
-    'Horst-Wessel-Lied',
-    'Nazi Anthem',
-    'P.O.W.',
-    'Salute',
-    'Searching For the Enemy',
-    'Suspense',
-    'Victors',
-    'Wondering About My Loved Ones',
-    'Funk You!',
-    'End of Level',
-    'Going After Hitler',
-    'Lurking...',
-    'The Ultimate Challenge',
-    'The Nazi Rap',
-    'Zero Hour',
-    'Twelfth Hour',
-    'Roster',
-    'U R A Hero',
-    'Victory March',
-    'Wolf Pac',
-)
-
-
-BUZZER_SOUND_LABELS = (
+SOUND_LABELS = (
     'HITWALLSND',
     'SELECTWPNSND',
     'SELECTITEMSND',
@@ -1680,9 +1573,231 @@ BUZZER_SOUND_LABELS = (
     'MISSILEHITSND',
 )
 
-BUZZER_SOUND_NAMES = BUZZER_SOUND_LABELS  # TODO
+SOUND_NAMES = (
+    'player__wall_hit',
+    '_SELECTWPNSND',
+    '_SELECTITEMSND',
+    '_HEARTBEATSND',
+    'menu__half_step',
+    'menu__step',
+    'player__no_way',
+    '_NAZIHITPLAYERSND',
+    'schabbs__attack',
+    'player__death',
+    'dog__death',
+    'chaingun__attack',
+    'pickup__key',
+    '_NOITEMSND',
+    '_WALK1SND',
+    '_WALK2SND',
+    '_TAKEDAMAGESND',
+    '_GAMEOVERSND',
+    'door__open',
+    'door__close',
+    'player__do_nothing',
+    'guard__wake',
+    'guard__death_2',
+    'knife__attack',
+    'pistol__attack',
+    'guard__death_3',
+    'machinegun__attack',
+    '_HITENEMYSND',
+    'menu__bind',
+    'guard__death_1',
+    'pickup__machinegun',
+    'pickup__ammo',
+    'menu__select',
+    'pickup__food',
+    'pickup__medkit',
+    'pickup__cross',
+    'pickup__chalice',
+    'pickup__jewels',
+    'pickup__chaingun',
+    'menu__exit',
+    'elevator__use',
+    'dog__wake',
+    'score__bonus_tens',
+    'score__bonus_got',
+    'pickup__life',
+    'pickup__crown',
+    'pushwall__move',
+    'score__no_bonus',
+    'score__100',
+    '_BOSSACTIVESND',
+    'hans__death',
+    'ss__wake',
+    'mutant__death',
+    'hitler__wake',
+    'hitler__death',
+    'hans__wake',
+    'ss__death',
+    'mecha_hitler__death',
+    'guard__attack',
+    'boss__gun_attack',
+    'ss__attack',
+    'blood__slurpie',
+    'robed_fake__wake',
+    'schabbs__death',
+    'schabbs__wake',
+    'robed_fake__death',
+    'officer__wake',
+    'officer__death',
+    'dog__attack',
+    'robed_fake__attack',
+    'mecha_hitler__step',
+    '_GOOBSSND',
+    'bj__yeah',
+    'guard__death_4',
+    'guard__death_5',
+    'secret__death',
+    'guard__death_6',
+    'guard__death_7',
+    'guard__death_8',
+    'otto__death',
+    'otto__wake',
+    'fettgesicht__wake',
+    'gretel__wake',
+    'gretel__death',
+    'fettgesicht__death',
+    'boss__missile_attack',
+    'missile__hit',
+)
+
+
+SAMPLED_SOUND_FREQUENCY = 7042
+
+SAMPLED_SOUND_LABELS = (
+    'HALTSND',
+    'DOGBARKSND',
+    'CLOSEDOORSND',
+    'OPENDOORSND',
+    'ATKMACHINEGUNSND',
+    'ATKPISTOLSND',
+    'ATKGATLINGSND',
+    'SCHUTZADSND',
+    'GUTENTAGSND',
+    'MUTTISND',
+    'BOSSFIRESND',
+    'SSFIRESND',
+    'DEATHSCREAM1SND',
+    'DEATHSCREAM2SND',
+    'DEATHSCREAM3SND',
+    'PUSHWALLSND',
+    'DOGDEATHSND',
+    'AHHHGSND',
+    'DIESND',
+    'EVASND',
+    'LEBENSND',
+    'NAZIFIRESND',
+    'SLURPIESND',
+    'TOT_HUNDSND',
+    'MEINGOTTSND',
+    'SCHABBSHASND',
+    'HITLERHASND',
+    'SPIONSND',
+    'NEINSOVASSND',
+    'DOGATTACKSND',
+    'LEVELDONESND',
+    'MECHSTEPSND',
+    'YEAHSND',
+    'SCHEISTSND',
+    'DEATHSCREAM4SND',
+    'DEATHSCREAM5SND',
+    'DONNERSND',
+    'EINESND',
+    'ERLAUBENSND',
+    'DEATHSCREAM6SND',
+    'DEATHSCREAM7SND',
+    'DEATHSCREAM8SND',
+    'DEATHSCREAM9SND',
+    'KEINSND',
+    'MEINSND',
+    'ROSESND',
+)
+
+SAMPLED_SOUND_INDICES = tuple(SOUND_LABELS.index(label) for label in SAMPLED_SOUND_LABELS)
+SAMPLED_SOUND_NAMES = tuple(SOUND_NAMES[i] for i in SAMPLED_SOUND_INDICES)
+
+
+BUZZER_SOUND_LABELS = SOUND_LABELS
+BUZZER_SOUND_INDICES = tuple(range(len(SOUND_LABELS)))
+BUZZER_SOUND_NAMES = SOUND_NAMES
 
 
 ADLIB_SOUND_LABELS = BUZZER_SOUND_LABELS
-
+ADLIB_SOUND_INDICES = BUZZER_SOUND_INDICES
 ADLIB_SOUND_NAMES = BUZZER_SOUND_NAMES
+
+
+MUSIC_LABELS = (
+    'CORNER_MUS',
+    'DUNGEON_MUS',
+    'WARMARCH_MUS',
+    'GETTHEM_MUS',
+    'HEADACHE_MUS',
+    'HITLWLTZ_MUS',
+    'INTROCW3_MUS',
+    'NAZI_NOR_MUS',
+    'NAZI_OMI_MUS',
+    'POW_MUS',
+    'SALUTE_MUS',
+    'SEARCHN_MUS',
+    'SUSPENSE_MUS',
+    'VICTORS_MUS',
+    'WONDERIN_MUS',
+    'FUNKYOU_MUS',
+    'ENDLEVEL_MUS',
+    'GOINGAFT_MUS',
+    'PREGNANT_MUS',
+    'ULTIMATE_MUS',
+    'NAZI_RAP_MUS',
+    'ZEROHOUR_MUS',
+    'TWELFTH_MUS',
+    'ROSTER_MUS',
+    'URAHERO_MUS',
+    'VICMARCH_MUS',
+    'PACMAN_MUS',
+)
+
+MUSIC_NAMES = (
+    'Enemy Around the Corner',
+    'Into the Dungeons',
+    'The March to War',
+    'Get Them Before They Get You',
+    'Pounding Headache',
+    'Hitler Waltz',
+    'Kill the S.O.B.',
+    'Horst-Wessel-Lied',
+    'Nazi Anthem',
+    'P.O.W.',
+    'Salute',
+    'Searching For the Enemy',
+    'Suspense',
+    'Victors',
+    'Wondering About My Loved Ones',
+    'Funk You!',
+    'End of Level',
+    'Going After Hitler',
+    'Lurking...',
+    'The Ultimate Challenge',
+    'The Nazi Rap',
+    'Zero Hour',
+    'Twelfth Hour',
+    'Roster',
+    'U R A Hero',
+    'Victory March',
+    'Wolf Pac',
+)
+
+
+MAP_USED_PLANES = (0, 1)
+
+MAP_TEXTURE_PARTITION_MAP = {  # TODO
+    'floors':   (0, 0),
+    'walls':    (0, 0),
+}
+
+MAP_STATIC_OBJECT_INDICES = ()  # TODO
+MAP_COLLECTABLE_OBJECT_INDICES = ()  # TODO
+MAP_ENEMY_BASE_INDICES = ()  # TODO
+

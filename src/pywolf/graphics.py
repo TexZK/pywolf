@@ -360,7 +360,11 @@ class FontManager(ResourceManager):
 class DOSScreen(object):
 
     def __init__(self, data):
+        assert len(data) % struct.calcsize('<BB') == 0
         self.data = data
+
+    def __len__(self):
+        return len(self.data) // 2
 
     # TODO: convert to image
 
