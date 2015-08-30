@@ -77,28 +77,28 @@ class Test(unittest.TestCase):
             with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
-    def testMap(self):
+    def testTileMaps(self):
         logger = logging.getLogger()
-        logger.info('testMap')
+        logger.info('testTileMaps')
 
-        map_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
+        tilemap_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
         with open(r'../data/wl6/maphead.wl6', 'rb') as (header_file
         ),   open(r'../data/wl6/gamemaps.wl6', 'rb') as data_file:
-            map_chunks_handler.load(data_file, header_file)
+            tilemap_chunks_handler.load(data_file, header_file)
 
-        count = len(map_chunks_handler)
-        for i, item in enumerate(map_chunks_handler):
+        count = len(tilemap_chunks_handler)
+        for i, item in enumerate(tilemap_chunks_handler):
             header, planes = item
-            logger.info('Map chunk [%d/%d]:', (i + 1), count)
+            logger.info('TileMap chunk [%d/%d]:', (i + 1), count)
             if header is not None:
                 header_bytes = header.to_bytes()
-                path = r'./outputs/map_{}_header.chunk'.format(i)
+                path = r'./outputs/tilemap_{}_header.chunk'.format(i)
                 logger.info('... header: %r, 0x%X', path, len(header_bytes))
                 with open(path, 'wb') as header_file:
                     header_file.write(header_bytes)
 
                 for j, plane in enumerate(planes):
-                    path = r'./outputs/map_{}_plane{}.chunk'.format(i, j)
+                    path = r'./outputs/tilemap_{}_plane{}.chunk'.format(i, j)
                     logger.info('... plane [%d/%d]: %r, 0x%X bytes', (j + 1), len(planes), path, len(plane))
                     with open(path, 'wb') as chunk_file:
                         chunk_file.write(plane)

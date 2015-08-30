@@ -9,8 +9,9 @@ import subprocess
 import tempfile
 import wave
 
-from .utils import (ResourceManager, stream_read, stream_write,
-                    stream_pack, stream_unpack, stream_unpack_array)
+from .utils import (stream_read, stream_write,
+                    stream_pack, stream_unpack, stream_unpack_array,
+                    BinaryResource, ResourceManager)
 
 ADLIB_CARRIERS = (3, 4, 5, 11, 12, 13, 19, 20, 21)
 ADLIB_MODULATORS = (0, 1, 2, 8, 9, 10, 16, 17, 18)
@@ -224,7 +225,7 @@ class BuzzerSoundManager(ResourceManager):
         return BuzzerSound(chunk)
 
 
-class AdLibSoundHeader(object):
+class AdLibSoundHeader(BinaryResource):
 
     SIZE = struct.calcsize('<LH13B3sB')
 
@@ -322,7 +323,7 @@ class AdLibSoundHeader(object):
         return b''.join([struct.pack('<H', length)] + setup_events_data)
 
 
-class AdLibSound(object):
+class AdLibSound(BinaryResource):
 
     def __init__(self, header, events, metadata=b''):
         self.header = header
@@ -396,7 +397,7 @@ class AdLibSoundManager(ResourceManager):
         return AdLibSound.from_bytes(chunk)
 
 
-class Music(object):
+class Music(BinaryResource):
 
     def __init__(self, events):
         self.events = events

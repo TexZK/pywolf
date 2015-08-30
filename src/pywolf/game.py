@@ -4,7 +4,52 @@
 
 import io
 
-from .utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array, ResourceManager)
+from .utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
+                    BinaryResource, ResourceManager)
+import array
+
+
+VERTICAL   = 0
+HORIZONTAL = 1
+
+
+STATIC_OBJECT_NAMES = [
+    'armor',
+    'barrel',
+    'basket',
+    'bed',
+    'blood_pool',
+    'bones__blood',
+    'bones_1',
+    'bones_2',
+    'bones_3',
+    'bones_4',
+    'bones_5',
+    'brown_plant',
+    'cage',
+    'cage__skeleton',
+    'ceiling_light',
+    'chandelier',
+    'flag',
+    'green_plant',
+    'hanging_skeleton',
+    'lamp',
+    'oil_drum',
+    'pillar',
+    'rack',
+    'sink',
+    'skeleton',
+    'stove',
+    'table',
+    'table__chairs',
+    'utensils_blue',
+    'utensils_brown',
+    'vase',
+    'vines',
+    'water_pool',
+    'well',
+    'well__water',
+]
 
 
 class Entity(object):
@@ -40,7 +85,7 @@ class Player(Entity):
         pass  # TODO
 
 
-class MapHeader(object):
+class TileMapHeader(BinaryResource):
 
     def __init__(self, plane_offsets, plane_sizes, dimensions, name):
         self.plane_offsets = plane_offsets
@@ -49,29 +94,24 @@ class MapHeader(object):
         self.name = name
 
     @classmethod
-    def from_stream(cls, data_stream, planes_count=3):
+    def from_stream(cls, stream, planes_count=3):
         planes_count = int(planes_count)
         assert planes_count > 0
-        plane_offsets = tuple(stream_unpack_array('<L', data_stream, planes_count))
-        plane_sizes = tuple(stream_unpack_array('<H', data_stream, planes_count))
-        dimensions = stream_unpack('<HH', data_stream)
-        name = stream_unpack('<16s', data_stream)[0].decode('ascii')
+        plane_offsets = tuple(stream_unpack_array('<L', stream, planes_count))
+        plane_sizes = tuple(stream_unpack_array('<H', stream, planes_count))
+        dimensions = stream_unpack('<HH', stream)
+        name = stream_unpack('<16s', stream)[0].decode('ascii').rstrip(' \t\r\n\v\0')
         return cls(plane_offsets, plane_sizes, dimensions, name)
 
-    def to_stream(self, data_stream):
-        stream_pack_array(data_stream, '<L', self.plane_offsets)
-        stream_pack_array(data_stream, '<H', self.plane_sizes)
-        stream_pack(data_stream, '<HH', *self.dimensions)
-        stream_pack(data_stream, '<16s', self.name.encode('ascii'))
+    def to_stream(self, stream):
+        stream_pack_array(stream, '<L', self.plane_offsets)
+        stream_pack_array(stream, '<H', self.plane_sizes)
+        stream_pack(stream, '<HH', *self.dimensions)
+        stream_pack(stream, '<16s', self.name.encode('ascii'))
 
     @classmethod
     def from_bytes(cls, data, planes_count=3):
         return cls.from_stream(io.BytesIO(data), planes_count)
-
-    def to_bytes(self):
-        data_stream = io.BytesIO()
-        self.to_stream(data_stream)
-        return data_stream.getvalue()
 
 
 class TileMap(object):
@@ -129,11 +169,12 @@ class TileMapManager(ResourceManager):
         super().__init__(chunks_handler, start, count, cache)
 
     def _build_resource(self, index, chunk):
-        header, planes = chunk
+        header, raw_planes = chunk
+        planes = [array.array('H', raw_plane) for raw_plane in raw_planes]
         return TileMap(header.dimensions, planes, header.name)
 
 
-class Game(object):
+class Game(object):  # TODO
 
     instance = None
 

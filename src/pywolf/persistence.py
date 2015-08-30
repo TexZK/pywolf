@@ -10,7 +10,7 @@ from .utils import (stream_bound, stream_read, stream_unpack, stream_unpack_arra
                     sequence_index, sequence_getitem,
                     huffman_expand, carmack_expand, rlew_expand,
                     HUFFMAN_NODES_COUNT)
-from .game import MapHeader
+from .game import TileMapHeader
 
 
 class ChunksHandler(object):
@@ -467,7 +467,7 @@ class MapChunksHandler(ChunksHandler):  # TODO
         chunk_size = chunk_offsets[index + 1] - chunk_offsets[index]
         if chunk_size:
             self._seek(index)
-            header = MapHeader.from_stream(data_stream, planes_count)
+            header = TileMapHeader.from_stream(data_stream, planes_count)
 
             for i in range(planes_count):
                 self._seek(i, header.plane_offsets)

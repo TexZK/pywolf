@@ -15,6 +15,40 @@ CARMACK_NEAR_TAG = 0xA7
 CARMACK_FAR_TAG = 0xA8
 
 
+def is_in_partition(index, partition):
+    start, count = partition
+    return start <= index < (start + count)
+
+
+def find_partition(index, partition_map, count_sign=1):
+    if count_sign > 0:
+        maximum = 0
+        found = None
+        for key, value in partition_map.items():
+            start, count = value
+            if start <= index < (start + count) and maximum < count:
+                maximum = count
+                found = key
+        if found is not None:
+            return found
+    elif count_sign < 0:
+        maximum = 0
+        found = None
+        for key, value in partition_map.items():
+            start, count = value
+            if start <= index < (start + count) and -count < maximum:
+                maximum = -count
+                found = key
+        if found is not None:
+            return found
+    else:
+        for key, value in partition_map.items():
+            start, count = value
+            if start <= index < (start + count):
+                return key
+    raise ValueError(key)
+
+
 def huffman_expand(data, expanded_size, nodes):
     assert expanded_size > 0
 
@@ -224,6 +258,26 @@ def sequence_getitem(key, length, getter):
         return [getter(i) for i in range(start, stop, step)]
     else:
         return getter(sequence_index(key, length))
+
+
+class BinaryResource(object):
+
+    @classmethod
+    def from_stream(cls, stream, *args, **kwargs):
+        raise NotImplementedError
+        return cls()
+
+    def to_stream(self, stream, *args, **kwargs):
+        raise NotImplementedError
+
+    @classmethod
+    def from_bytes(cls, data, *args, **kwargs):
+        return cls.from_stream(io.BytesIO(data), *args, **kwargs)
+
+    def to_bytes(self, *args, **kwargs):
+        stream = io.BytesIO()
+        self.to_stream(stream, *args, **kwargs)
+        return stream.getvalue()
 
 
 class ResourceManager(object):

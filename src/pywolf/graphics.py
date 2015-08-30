@@ -7,7 +7,8 @@ import struct
 
 from PIL import Image
 
-from .utils import ResourceManager, stream_write, stream_pack, stream_unpack, stream_unpack_array
+from .utils import (stream_write, stream_pack, stream_unpack, stream_unpack_array,
+                    BinaryResource, ResourceManager)
 
 
 ALPHA_INDEX = 0xFF
@@ -215,7 +216,7 @@ class TextureManager(ResourceManager):
         return Texture(dimensions, pixels, palette)
 
 
-class SpriteHeader(object):
+class SpriteHeader(BinaryResource):
 
     def __init__(self, left, right, offsets):
         self.left = left
@@ -258,7 +259,7 @@ class SpriteManager(ResourceManager):
         return Sprite(dimensions, pixels, palette, alpha_index)
 
 
-class FontHeader(object):
+class FontHeader(BinaryResource):
 
     CHARACTER_COUNT = 256
 
