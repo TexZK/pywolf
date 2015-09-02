@@ -1,7 +1,6 @@
 # TODO: create Exporter class(es)
 # TODO: break export loops into single item calls with wrapping loop
 # TODO: allow export to normal file, PK3 being an option (like with open(file_object|path))
-
 '''
 @author: Andrea Zoppi
 '''
@@ -17,6 +16,8 @@ from PIL import Image
 
 from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave
 import pywolf.configs.wl6 as CONFIG_WL6
+from pywolf.game import COLLECTABLE_OBJECT_NAMES, STATIC_OBJECT_NAMES, SOLID_OBJECT_NAMES
+import pywolf.game
 from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
 from pywolf.utils import stream_pack, find_partition
@@ -49,6 +50,7 @@ SPRITE_SHADER_TEMPLATE = '''
     surfaceparm trans
     surfaceparm nomarks
     cull none
+    sort seeThrough
     {{
         clampmap {1!s}
         blendFunc blend
@@ -101,6 +103,47 @@ TURN_TO_YAW = [
     315,
 ]
 
+TURN_TO_DISPL = [
+    (  1,  0),
+    (  1, -1),
+    (  0, -1),
+    ( -1, -1),
+    ( -1,  0),
+    ( -1,  1),
+    (  0,  1),
+    (  1,  1),
+]
+
+
+def build_cuboid_vertices(extreme_a, extreme_b):
+    xa, ya, za = extreme_a
+    xb, yb, zb = extreme_b
+    return [[(xb, yb, zb), (xa, yb, zb), (xa, yb, za), (xb, yb, za)],
+            [(xb, ya, zb), (xb, yb, zb), (xb, yb, za), (xb, ya, za)],
+            [(xa, ya, zb), (xb, ya, zb), (xb, ya, za), (xa, ya, za)],
+            [(xa, yb, zb), (xa, ya, zb), (xa, ya, za), (xa, yb, za)],
+            [(xa, yb, zb), (xb, yb, zb), (xb, ya, zb), (xa, ya, zb)],
+            [(xb, yb, za), (xa, yb, za), (xa, ya, za), (xb, ya, za)]]
+
+
+def describe_cuboid_brush(face_vertices, face_shaders, shader_scales, format_line=None,
+                          flip_directions=(NORTH, WEST)):
+    if format_line is None:
+        format_line = ('( {0[0]:.0f} {0[1]:.0f} {0[2]:.0f} ) '
+                       '( {1[0]:.0f} {1[1]:.0f} {1[2]:.0f} ) '
+                       '( {2[0]:.0f} {2[1]:.0f} {2[2]:.0f} ) '
+                       '"{3!s}" 0 0 0 {4:f} {5:f} 0 0 0')
+    lines = ['{']
+    for direction, shader_name, vertices in zip(range(len(face_vertices)), face_shaders, face_vertices):
+        scale_u = shader_scales[0]
+        scale_v = shader_scales[1]
+        if direction in flip_directions:
+            scale_u = -scale_u
+        line = format_line.format(vertices[0], vertices[1], vertices[2], shader_name, scale_u, scale_v)
+        lines.append(line)
+    lines.append('}')
+    return lines
+
 
 class MapExporter(object):  # TODO
 
@@ -123,77 +166,42 @@ class MapExporter(object):  # TODO
 
     def center_units(self, tile_coords, unit_offsets=(0, 0, 0), center_z=False):
         units = self.tile_to_unit_coords(tile_coords)
-        half  = self.params.tile_units * 0.5
-        return [
-            (unit_offsets[0] + units[0] + half),
-            (unit_offsets[1] + units[1] + half),
-            (unit_offsets[2] + (half if center_z else 0)),
-        ]
+        half = self.params.tile_units / 2
+        return [(unit_offsets[0] + units[0] + half),
+                (unit_offsets[1] + units[1] + half),
+                (unit_offsets[2] + (half if center_z else 0))]
 
     def describe_textured_cube(self, tile_coords, face_shaders, unit_offsets=(0, 0, 0)):
-        center = self.center_units(tile_coords, unit_offsets, center_z=True)
-        half = self.params.tile_units * 0.5
-        face_vertices = [
-            [
-                [(center[0] + half), (center[1] + half), (center[2] + half)],
-                [(center[0] - half), (center[1] + half), (center[2] + half)],
-                [(center[0] - half), (center[1] + half), (center[2] - half)],
-                [(center[0] + half), (center[1] + half), (center[2] - half)],
-            ],
-            [
-                [(center[0] + half), (center[1] - half), (center[2] + half)],
-                [(center[0] + half), (center[1] + half), (center[2] + half)],
-                [(center[0] + half), (center[1] + half), (center[2] - half)],
-                [(center[0] + half), (center[1] - half), (center[2] - half)],
-            ],
-            [
-                [(center[0] - half), (center[1] - half), (center[2] + half)],
-                [(center[0] + half), (center[1] - half), (center[2] + half)],
-                [(center[0] + half), (center[1] - half), (center[2] - half)],
-                [(center[0] - half), (center[1] - half), (center[2] - half)],
-            ],
-            [
-                [(center[0] - half), (center[1] + half), (center[2] + half)],
-                [(center[0] - half), (center[1] - half), (center[2] + half)],
-                [(center[0] - half), (center[1] - half), (center[2] - half)],
-                [(center[0] - half), (center[1] + half), (center[2] - half)],
-            ],
-            [
-                [(center[0] - half), (center[1] + half), (center[2] + half)],
-                [(center[0] + half), (center[1] + half), (center[2] + half)],
-                [(center[0] + half), (center[1] - half), (center[2] + half)],
-                [(center[0] - half), (center[1] - half), (center[2] + half)],
-            ],
-            [
-                [(center[0] + half), (center[1] + half), (center[2] - half)],
-                [(center[0] - half), (center[1] + half), (center[2] - half)],
-                [(center[0] - half), (center[1] - half), (center[2] - half)],
-                [(center[0] + half), (center[1] - half), (center[2] - half)],
-            ],
+        center_x, center_y, center_z = self.center_units(tile_coords, unit_offsets, center_z=True)
+        half = self.params.tile_units / 2
+        extreme_a = ((center_x - half), (center_y - half), (center_z - half))
+        extreme_b = ((center_x + half), (center_y + half), (center_z + half))
+        face_vertices = build_cuboid_vertices(extreme_a, extreme_b)
+        shader_scales = [self.params.texture_scale, self.params.texture_scale]
+        return describe_cuboid_brush(face_vertices, face_shaders, shader_scales)
+
+    def describe_textured_sprite(self, tile_coords, face_shader, unit_offsets=(0, 0, 0)):
+        center_x, center_y, center_z = self.center_units(tile_coords, unit_offsets, center_z=True)
+        half = self.params.tile_units / 2
+        extreme_a = ((center_x - (half - 1)), (center_y - 1), (center_z - half))
+        extreme_b = ((center_x + (half - 1)), (center_y + 0), (center_z + half))
+        face_vertices = build_cuboid_vertices(extreme_a, extreme_b)
+        face_shaders = [
+            face_shader,
+            'common/nodraw',
+            'common/nodraw',
+            'common/nodraw',
+            'common/nodraw',
+            'common/nodraw',
         ]
-        # FIXME: flipped X/Y textures --> flip X scale sign
-
-        texture_scale = self.params.texture_scale
-        format_line = ('( {0[0]:.0f} {0[1]:.0f} {0[2]:.0f} ) '
-                       '( {1[0]:.0f} {1[1]:.0f} {1[2]:.0f} ) '
-                       '( {2[0]:.0f} {2[1]:.0f} {2[2]:.0f} ) '
-                       '"{3!s}" 0 0 0 {4:f} {5:f} 0 0 0').format
-
-        lines = ['{']
-        for direction, shader_name, vertices in zip(range(len(face_vertices)), face_shaders, face_vertices):
-            scale_x = -texture_scale if direction in (NORTH, WEST) else texture_scale
-            scale_y = texture_scale
-            line = format_line(vertices[0], vertices[1], vertices[2], shader_name, scale_x, scale_y)
-            lines.append(line)
-        lines.append('}')
-        return lines
+        shader_scales = [self.params.texture_scale, self.params.texture_scale]
+        return describe_cuboid_brush(face_vertices, face_shaders, shader_scales)
 
     def describe_area_brushes(self, tile_coords):  # TODO: support for all floor/ceiling modes of ChaosEdit
         params = self.params
         config = self.config
         tilemap_index = self.tilemap_index
         tile_units = params.tile_units
-        unit_offsets = self.unit_offsets
         format_palette_texture = '{}_palette/color_0x{:02x}'.format
         lines = []
 
@@ -203,9 +211,10 @@ class MapExporter(object):  # TODO
             'common/caulk',
             'common/caulk',
             'common/caulk',
-            format_palette_texture(params.short_name, config.MAP_CEILING_COLORS[tilemap_index]),
+            format_palette_texture(params.short_name, config.CEILING_COLORS[tilemap_index]),
         ]
-        offsets = (unit_offsets[0], unit_offsets[1], (unit_offsets[2] + tile_units))
+        offsets = list(self.unit_offsets)
+        offsets[2] += tile_units
         lines.extend(self.describe_textured_cube(tile_coords, face_shaders, offsets))
 
         face_shaders = [
@@ -213,10 +222,11 @@ class MapExporter(object):  # TODO
             'common/caulk',
             'common/caulk',
             'common/caulk',
-            format_palette_texture(params.short_name, config.MAP_FLOOR_COLORS[tilemap_index]),
+            format_palette_texture(params.short_name, config.FLOOR_COLORS[tilemap_index]),
             'common/caulk',
         ]
-        offsets = (unit_offsets[0], unit_offsets[1], (unit_offsets[2] - tile_units))
+        offsets = list(self.unit_offsets)
+        offsets[2] -= tile_units
         lines.extend(self.describe_textured_cube(tile_coords, face_shaders, offsets))
 
         return lines
@@ -227,9 +237,8 @@ class MapExporter(object):  # TODO
         tilemap = self.tilemap
         x, y = tile_coords
         tile = tilemap[x, y]
-        unit_offsets = self.unit_offsets
-        partition_map = config.MAP_TILE_PARTITION_MAP
-        pushwall_entity = config.MAP_ENTITY_PARTITION_MAP['pushwall'][0]
+        partition_map = config.TILE_PARTITION_MAP
+        pushwall_entity = config.ENTITY_PARTITION_MAP['pushwall'][0]
         face_shaders = []
 
         for direction, displacement in enumerate(DIR_TO_DISPL[:4]):
@@ -254,83 +263,228 @@ class MapExporter(object):  # TODO
                         raise ValueError((tile_coords, facing_partition))
 
                     shader = '{}_wall/{}__{}'.format(params.short_name, config.TEXTURE_NAMES[texture],
-                                                      (direction & 1))
+                                                     (direction & 1))
             face_shaders.append(shader)
 
         face_shaders.append('common/caulk')
         face_shaders.append('common/caulk')
 
         if any(shader != 'common/caulk' for shader in face_shaders):
-            return self.describe_textured_cube(tile_coords, face_shaders, unit_offsets)
+            return self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets)
         else:
             return ()
+
+    def describe_sprite(self, tile_coords):
+        params = self.params
+        config = self.config
+        entity = self.tilemap[tile_coords][1]
+        name = config.ENTITY_OBJECT_MAP[entity]
+        lines = []
+
+        if name in SOLID_OBJECT_NAMES:
+            face_shaders = ['common/clip'] * 6
+            lines.extend(self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets))
+
+        face_shader = '{}_static/{}'.format(params.short_name, name)
+        lines.extend(self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets))
+
+        return lines
+
+    def describe_door(self, tile_coords):
+        params = self.params
+        config = self.config
+        tile = self.tilemap[tile_coords][0]
+        _, texture_name, vertical = config.DOOR_MAP[tile]
+
+        trigger_begin = [
+            '{',
+            'classname func_invisible_user',
+            'spawnflags 8  // not_kickable',
+            'target door_{:.0f}_{:.0f}'.format(*tile_coords),
+            'cursorhint HINT_DOOR',
+        ]
+        trigger_end = ['}']
+
+        face_shaders = ['common/trigger'] * 6
+        trigger_brush = self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets)
+
+        door_begin = [
+            '{',
+            'classname func_door',
+            'targetname door_{:.0f}_{:.0f}'.format(*tile_coords),
+            'angle {:.0f}'.format(270 if vertical else 0),
+            'lip 0',
+            'dmg 0',
+            'speed 64',
+            'wait 5',
+            'type 1  // needs overridden metallic sounds!',
+        ]
+        door_end = ['}']
+
+        face_shaders = ['common/clip'] * 6
+        clip_lines = self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets)
+
+        face_shader = '{}_wall/{}__{}'.format(params.short_name, texture_name, int(vertical))
+        center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
+        half = self.params.tile_units / 2
+        if vertical:
+            extreme_a = ((center_x - 1), (center_y - half), (center_z - half))
+            extreme_b = ((center_x + 1), (center_y + half), (center_z + half))
+        else:
+            extreme_a = ((center_x - half), (center_y - 1), (center_z - half))
+            extreme_b = ((center_x + half), (center_y + 1), (center_z + half))
+        face_vertices = build_cuboid_vertices(extreme_a, extreme_b)
+        face_shaders = [
+            face_shader,
+            face_shader,
+            face_shader,
+            face_shader,
+            'common/nodraw',
+            'common/nodraw',
+        ]
+        shader_scales = [self.params.texture_scale, self.params.texture_scale]
+        panel_lines = describe_cuboid_brush(face_vertices, face_shaders, shader_scales,
+                                            flip_directions=(EAST, WEST))
+
+        return (trigger_begin + trigger_brush + trigger_end +
+                door_begin + clip_lines + panel_lines + door_end)
 
     def describe_worldspawn(self):
         params = self.params
         config = self.config
         dimensions = self.tilemap.dimensions
         tilemap = self.tilemap
-        pushwall_entity = config.MAP_ENTITY_PARTITION_MAP['pushwall'][0]
-        music_name = config.MUSIC_NAMES[config.MAP_TILEMAP_MUSIC_INDICES[self.tilemap_index]]
+        pushwall_entity = config.ENTITY_PARTITION_MAP['pushwall'][0]
+        music_name = config.MUSIC_NAMES[config.TILEMAP_MUSIC_INDICES[self.tilemap_index]]
 
         lines = ['{',
                  'classname worldspawn',
                  'message "{}"'.format(tilemap.name),
                  'music "music/{}/{}"'.format(params.short_name, music_name),
-                 '_ambient 1']
+                 'ambient 100',
+                 '_color "1 1 1"']
 
         for tile_y in range(dimensions[1]):
             for tile_x in range(dimensions[0]):
-                tile = tilemap[tile_x, tile_y]
-                partition = find_partition(tile[0], config.MAP_TILE_PARTITION_MAP, count_sign=1)
-                lines.append('// {} @ ({}, {}) = tile 0x{:04X}'.format(partition, tile_x, tile_y, tile[0]))
+                tile_coords = (tile_x, tile_y)
+                tile = tilemap[tile_coords]
 
-                if (partition in ('floor', 'door', 'door_silver', 'door_gold', 'door_elevator') or
-                    tile[1] == pushwall_entity):  # FIXME: or pushwall object!
-                    lines.extend(self.describe_area_brushes((tile_x, tile_y)))
-                elif partition == 'wall':
-                    lines.extend(self.describe_wall_brush((tile_x, tile_y)))
-                else:
-                    raise ValueError(((tile_x, tile_y), partition))
+                if tile[0]:
+                    partition = find_partition(tile[0], config.TILE_PARTITION_MAP, count_sign=1)
+                    lines.append('// {} @ {!r} = tile 0x{:04X}'.format(partition, tile_coords, tile[0]))
 
-                # TODO: static sprite + clip brush
+                    if (partition in ('floor', 'door', 'door_silver', 'door_gold', 'door_elevator') or
+                        tile[1] == pushwall_entity):
+                        lines.extend(self.describe_area_brushes(tile_coords))
+                    elif partition == 'wall':
+                        lines.extend(self.describe_wall_brush(tile_coords))
+                    else:
+                        raise ValueError((tile_coords, partition))
+
+                if tile[1]:
+                    object_name = config.ENTITY_OBJECT_MAP.get(tile[1])
+                    if object_name and object_name in STATIC_OBJECT_NAMES:
+                        lines += self.describe_sprite(tile_coords)
 
         lines.append('}  // worldspawn')
         return lines
 
     def describe_player_start(self, tile_coords):
-        config = self.config
-        x, y = tile_coords
-        tile = self.tilemap[x, y]
-        index = tile[1] - config.MAP_ENTITY_PARTITION_MAP['start'][0]
-        coords = self.center_units(tile_coords, self.unit_offsets)
-        coords[2] += 32
+        tile = self.tilemap[tile_coords]
+        index = tile[1] - self.config.ENTITY_PARTITION_MAP['start'][0]
+        origin = self.center_units(tile_coords, self.unit_offsets)
+        origin[2] += 32
         return [
             '{',
             'classname info_player_start',
-            'origin "{:.0f} {:.0f} {:.0f}"'.format(*coords),
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
             'angle {:.0f}'.format(DIR_TO_YAW[index]),
             '}',
         ]
+
+    def describe_turn(self, tile_coords, turn_coords):
+        tilemap = self.tilemap
+        index = tilemap[tile_coords][1] - self.config.ENTITY_PARTITION_MAP['turn'][0]
+        origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
+        step = TURN_TO_DISPL[index]
+        target_coords = [(tile_coords[0] + step[0]), (tile_coords[1] + step[1])]
+        lines = []
+
+        found = False
+        while tilemap.check_coords(target_coords):
+            for coords in turn_coords:
+                if coords[0] == target_coords[0] and coords[1] == target_coords[1]:
+                    found = True
+                    break
+            else:
+                target_coords[0] += step[0]
+                target_coords[1] += step[1]
+            if found:
+                break
+        else:
+            raise ValueError('no target turning point for the one at {!r}'.format(tile_coords))
+
+        # TODO: ai_target
+
+        lines += [
+            '{',
+            'classname path_corner',
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
+            'angle {:.0f}'.format(TURN_TO_YAW[index]),
+            'targetname corner_{:.0f}_{:.0f}'.format(*tile_coords),
+            'target corner_{:.0f}_{:.0f}'.format(*target_coords),
+            '}',
+        ]
+
+        return lines
+
+    def describe_enemy(self, tile_coords, turn_tiles):
+        return ()  # TODO
+
+    def describe_object(self, tile_coords):
+        return ()  # TODO
+
+    def describe_pushwall(self, tile_coords):
+        return ()  # TODO
 
     def describe_entities(self):  # TODO
         config = self.config
         dimensions = self.tilemap.dimensions
         tilemap = self.tilemap
         lines = []
+        turn_coords = []
+        enemy_coords = []
 
         for tile_y in range(dimensions[1]):
             for tile_x in range(dimensions[0]):
-                tile = tilemap[tile_x, tile_y]
-                try:
-                    partition = find_partition(tile[1], config.MAP_ENTITY_PARTITION_MAP, count_sign=-1)
-                except ValueError:
-                    continue
-                lines.append('// {} @ ({}, {}) = entity 0x{:04X}'.format(partition, tile_x, tile_y, tile[1]))
+                tile_coords = (tile_x, tile_y)
+                tile = tilemap[tile_coords]
 
-                if partition == 'start':
-                    lines += self.describe_player_start((tile_x, tile_y))
-                # TODO
+                if tile[1]:
+                    partition = find_partition(tile[1], config.ENTITY_PARTITION_MAP, count_sign=-1)
+                    lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
+
+                    if partition == 'start':
+                        lines += self.describe_player_start(tile_coords)
+                    elif partition == 'turn':
+                        turn_coords.append(tile_coords)
+                    elif partition == 'enemy':
+                        enemy_coords.append(tile_coords)
+                    elif partition == 'pushwall':
+                        lines += self.describe_pushwall(tile_coords)
+                    elif partition == 'object' and config.ENTITY_OBJECT_MAP[tile[1]] in COLLECTABLE_OBJECT_NAMES:
+                        lines += self.describe_object(tile_coords)
+
+                if tile[0]:
+                    if tile[0] in config.DOOR_MAP:
+                        lines.append('// {} @ {!r} = door 0x{:04X}'.format(partition, tile_coords, tile[0]))
+                        lines += self.describe_door(tile_coords)
+
+        for coords in turn_coords:
+            lines += self.describe_turn(coords, turn_coords)
+
+        for coords in enemy_coords:
+            lines += self.describe_enemy(coords, turn_coords)
 
         return lines
 
@@ -431,26 +585,23 @@ def write_texture_shaders(params, config, shader_file):
 
 
 def write_sprite_shaders(params, config, shader_file):
-    for name_index in config.STATIC_SPRITE_INDICES:
-        name = config.SPRITE_NAMES[name_index]
+    for name in STATIC_OBJECT_NAMES:
         shader_name = 'textures/{}_static/{}'.format(params.short_name, name)
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         shader_file.write(SPRITE_SHADER_TEMPLATE.format(shader_name, path))
 
 
-def export_shaders(params, config, zip_file):
+def export_shaders(params, config, zip_file):  # TODO: split shaders
     logger = logging.getLogger()
     logger.info('Exporting shaders')
 
+    script_name = '{}_static.shader'.format(params.short_name)
     shader_text_stream = io.StringIO()
-    # write_texture_shaders(params, config, shader_text_stream)  # FIXME: really needed for them?
     write_sprite_shaders(params, config, shader_text_stream)
-    zip_file.writestr('scripts/{}.shader'.format(params.short_name),
-                      shader_text_stream.getvalue().encode())
-
+    zip_file.writestr('scripts/{}'.format(script_name), shader_text_stream.getvalue().encode())
     folder = os.path.join(params.output_folder, 'scripts')
     os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, 'wolf3d.shader'), 'wt') as shader_file:
+    with open(os.path.join(folder, script_name), 'wt') as shader_file:
         shader_file.write(shader_text_stream.getvalue())
 
     logger.info('Done')
@@ -826,8 +977,10 @@ def main(*args):
 
     pk3_path = os.path.join(params.output_folder, params.output_pk3)
     logger.info('Creating PK3 (ZIP/deflated) file: %r', pk3_path)
-    with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:
+    with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:  # TODO: split PK3 files
         _sep()
+        export_tilemaps(params, config, pk3_file, tilemap_chunks_handler)  # FIXME: PK3 not needed
+#XXX
         export_shaders(params, config, pk3_file)
         export_textures(params, config, pk3_file, vswap_chunks_handler)
         export_sprites(params, config, pk3_file, vswap_chunks_handler)
@@ -839,11 +992,10 @@ def main(*args):
         export_endarts(params, config, pk3_file, graphics_chunks_handler)
 
         export_sampled_sounds(params, config, pk3_file, vswap_chunks_handler)
-        export_musics(params, config, pk3_file, audio_chunks_handler)
+#XXX        export_musics(params, config, pk3_file, audio_chunks_handler)
         export_adlib_sounds(params, config, pk3_file, audio_chunks_handler)
         export_buzzer_sounds(params, config, pk3_file, audio_chunks_handler)
 
-        export_tilemaps(params, config, pk3_file, tilemap_chunks_handler)  # FIXME: PK3 not needed
         # TODO: export_models(params, config, pk3_file, ?)
 
         pass  # TODO: remove line

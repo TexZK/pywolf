@@ -2,10 +2,10 @@
 @author: Andrea Zoppi
 '''
 
-import sys
+import array
 import io
 import struct
-import array
+import sys
 
 
 HUFFMAN_NODES_COUNT = 255
@@ -15,9 +15,12 @@ CARMACK_NEAR_TAG = 0xA7
 CARMACK_FAR_TAG = 0xA8
 
 
-def is_in_partition(index, partition):
-    start, count = partition
-    return start <= index < (start + count)
+def is_in_partition(index, *partitions):
+    for partition in partitions:
+        start, count = partition
+        if start <= index < (start + count):
+            return True
+    return False
 
 
 def find_partition(index, partition_map, count_sign=1):

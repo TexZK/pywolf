@@ -2,11 +2,11 @@
 @author: Andrea Zoppi
 '''
 
+import array
 import io
 
 from .utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
                     BinaryResource, ResourceManager)
-import array
 
 
 VERTICAL   = 0
@@ -32,6 +32,7 @@ STATIC_OBJECT_NAMES = [
     'chandelier',
     'flag',
     'green_plant',
+    'guard__dead',
     'hanging_skeleton',
     'lamp',
     'oil_drum',
@@ -49,6 +50,68 @@ STATIC_OBJECT_NAMES = [
     'water_pool',
     'well',
     'well__water',
+]
+
+SOLID_OBJECT_NAMES = [
+    'armor',
+    'barrel',
+    'bed',
+    'brown_plant',
+    'cage',
+    'cage__skeleton',
+    'flag',
+    'green_plant',
+    'hanging_skeleton',
+    'lamp',
+    'oil_drum',
+    'pillar',
+    'rack',
+    'sink',
+    'stove',
+    'table',
+    'table__chairs',
+    'utensils_blue',
+    'utensils_brown',
+    'vase',
+    'well',
+    'well__water',
+]
+
+COLLECTABLE_OBJECT_NAMES = [
+    'ammo',
+    'chaingun',
+    'chalice',
+    'cross',
+    'crown',
+    'dog_food',
+    'extra_life',
+    'food',
+    'gold_key',
+    'jewels',
+    'machinegun',
+    'medkit',
+    'silver_key',
+]
+
+ENEMY_NAMES = [
+    'dog',
+    'fettgesicht',
+    'ghost_blinky',
+    'ghost_clyde',
+    'ghost_inky',
+    'ghost_pinky',
+    'gretel',
+    'guard',
+    'hans',
+    'hitler',
+    'mecha_hitler',
+    'mutant',
+    'needle',
+    'officer',
+    'otto',
+    'robed_fake',
+    'schabbs',
+    'ss',
 ]
 
 
@@ -161,6 +224,10 @@ class TileMap(object):
             return self[key]
         else:
             return default
+
+    def check_coords(self, tile_coords):
+        return (0 <= tile_coords[0] < self.dimensions[0] and
+                0 <= tile_coords[1] < self.dimensions[1])
 
 
 class TileMapManager(ResourceManager):

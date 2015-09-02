@@ -1425,44 +1425,6 @@ SPRITE_NAMES = [
     'chaingun__attack_a3',
 ]
 
-STATIC_SPRITE_INDICES = [SPRITE_NAMES.index(name) for name in [
-    'water_pool',
-    'oil_drum',
-    'table__chairs',
-    'lamp',
-    'chandelier',
-    'hanging_skeleton',
-    'pillar',
-    'green_plant',
-    'skeleton',
-    'sink',
-    'brown_plant',
-    'vase',
-    'table',
-    'ceiling_light',
-    'utensils_brown',
-    'armor',
-    'cage',
-    'cage__skeleton',
-    'bones_1',
-    'bed',
-    'basket',
-    'bones__blood',
-    'barrel',
-    'well__water',
-    'well',
-    'blood_pool',
-    'flag',
-    'bones_5',
-    'bones_2',
-    'bones_3',
-    'bones_4',
-    'utensils_blue',
-    'stove',
-    'rack',
-    'vines',
-]]
-
 
 SCREEN_NAMES = [
     'exit',
@@ -1784,9 +1746,7 @@ MUSIC_NAMES = [
 ]
 
 
-MAP_USED_PLANES = [0, 1]
-
-MAP_TILE_PARTITION_MAP = {
+TILE_PARTITION_MAP = {
     'wall':             (  1,  48),
 
     'door_panel':       ( 50,   1),
@@ -1798,52 +1758,34 @@ MAP_TILE_PARTITION_MAP = {
     'door_gold':        ( 94,   2),
     'door_elevator':    (100,   2),
 
-    'floor':    (106,  38),  # includes the ones below
-    'deaf':     (106,   1),
-    'secret':   (107,   1),
-    'area':     (107,  36),
+    'floor':            (106,  38),  # includes the ones below
+    'deaf':             (106,   1),
+    'secret':           (107,   1),
+    'area':             (107,  36),
 }
 
-MAP_ENTITY_PARTITION_MAP = {  # TODO
-    'start':    (19,  4),
-    'arrow':    (90,  8),
-    'pushwall': (98,  1),
-    'endgame':  (99,  1),
-    'object':   (23, 47),
-
-    'guard__stand_v1':      (108, 4),
-    'guard__stand_v3':      (144, 4),
-    'guard__stand_v4':      (180, 4),
-    'guard__walk_v1':       (112, 4),
-    'guard__walk_v3':       (148, 4),
-    'guard__walk_v4':       (184, 4),
-    'guard__dead':          (124, 1),
-
-    'ss__stand_v1':         (126, 4),
-    'ss__stand_v3':         (162, 4),
-    'ss__stand_v4':         (198, 4),
-    'ss__walk_v1':          (130, 4),
-    'ss__walk_v3':          (166, 4),
-    'ss__walk_v4':          (202, 4),
-
-    'mutant__stand_v1':     (216, 4),
-    'mutant__stand_v3':     (234, 4),
-    'mutant__stand_v4':     (252, 4),
-    'mutant__walk_v1':      (220, 4),
-    'mutant__walk_v3':      (238, 4),
-    'mutant__walk_v4':      (256, 4),
-
-    'officer__stand_v1':    (116, 4),
-    'officer__stand_v3':    (152, 4),
-    'officer__stand_v4':    (188, 4),
-    'officer__walk_v1':     (120, 4),
-    'officer__walk_v3':     (156, 4),
-    'officer__walk_v4':     (192, 4),
-
-    # TODO: bosses
+DOOR_MAP = {  # {tile: (name, vertical)}
+    90:  ('door',          'door_panel',    True),
+    91:  ('door',          'door_panel',    False),
+    92:  ('door_silver',   'door_locked',   True),
+    93:  ('door_silver',   'door_locked',   False),
+    94:  ('door_gold',     'door_locked',   True),
+    95:  ('door_gold',     'door_locked',   False),
+    100: ('door_elevator', 'door_elevator', True),
+    101: ('door_elevator', 'door_elevator', False),
 }
 
-MAP_STATIC_OBJECT_MAP = {
+ENTITY_PARTITION_MAP = {  # TODO
+    'start':        ( 19,   4),
+    'turn':         ( 90,   8),
+    'pushwall':     ( 98,   1),
+    'endgame':      ( 99,   1),
+    'object':       ( 23,  47),
+    'enemy':        (100, 200),  # broad range
+    'dead_guard':   (124,   1),  # inside of enemies, whatever...
+}
+
+ENTITY_OBJECT_MAP = {
     23: 'water_pool',
     24: 'oil_drum',
     25: 'table__chairs',
@@ -1878,9 +1820,7 @@ MAP_STATIC_OBJECT_MAP = {
     68: 'stove',
     69: 'rack',
     70: 'vines',
-}
 
-MAP_COLLECTABLE_OBJECT_MAP = {
     29: 'dog_food',
     43: 'gold_key',
     44: 'silver_key',
@@ -1894,10 +1834,128 @@ MAP_COLLECTABLE_OBJECT_MAP = {
     54: 'jewels',
     55: 'crown',
     56: 'extra_life',
+
+    124: 'guard__dead',
 }
 
 
-MAP_TILEMAP_MUSIC_LABELS = [
+ENEMY_MAP = {  # {'name', direction_index, moving, level}
+    180: ('guard', 0, False, 3),
+    181: ('guard', 1, False, 3),
+    182: ('guard', 2, False, 3),
+    183: ('guard', 3, False, 3),
+    144: ('guard', 0, False, 2),
+    145: ('guard', 1, False, 2),
+    146: ('guard', 2, False, 2),
+    147: ('guard', 3, False, 2),
+    108: ('guard', 0, False, 0),
+    109: ('guard', 1, False, 0),
+    110: ('guard', 2, False, 0),
+    111: ('guard', 3, False, 0),
+    184: ('guard', 0, True,  3),
+    185: ('guard', 1, True,  3),
+    186: ('guard', 2, True,  3),
+    187: ('guard', 3, True,  3),
+    148: ('guard', 0, True,  2),
+    149: ('guard', 1, True,  2),
+    150: ('guard', 2, True,  2),
+    151: ('guard', 3, True,  2),
+    112: ('guard', 0, True,  0),
+    113: ('guard', 1, True,  0),
+    114: ('guard', 2, True,  0),
+    115: ('guard', 3, True,  0),
+
+    188: ('officer', 0, False, 3),
+    189: ('officer', 1, False, 3),
+    190: ('officer', 2, False, 3),
+    191: ('officer', 3, False, 3),
+    152: ('officer', 0, False, 2),
+    153: ('officer', 1, False, 2),
+    154: ('officer', 2, False, 2),
+    155: ('officer', 3, False, 2),
+    116: ('officer', 0, False, 0),
+    117: ('officer', 1, False, 0),
+    118: ('officer', 2, False, 0),
+    119: ('officer', 3, False, 0),
+    192: ('officer', 0, True,  3),
+    193: ('officer', 1, True,  3),
+    194: ('officer', 2, True,  3),
+    195: ('officer', 3, True,  3),
+    156: ('officer', 0, True,  2),
+    157: ('officer', 1, True,  2),
+    158: ('officer', 2, True,  2),
+    159: ('officer', 3, True,  2),
+    120: ('officer', 0, True,  0),
+    121: ('officer', 1, True,  0),
+    122: ('officer', 2, True,  0),
+    123: ('officer', 3, True,  0),
+
+    198: ('ss', 0, False, 3),
+    199: ('ss', 1, False, 3),
+    200: ('ss', 2, False, 3),
+    201: ('ss', 3, False, 3),
+    162: ('ss', 0, False, 2),
+    163: ('ss', 1, False, 2),
+    164: ('ss', 2, False, 2),
+    165: ('ss', 3, False, 2),
+    126: ('ss', 0, False, 0),
+    127: ('ss', 1, False, 0),
+    128: ('ss', 2, False, 0),
+    129: ('ss', 3, False, 0),
+    202: ('ss', 0, True,  3),
+    203: ('ss', 1, True,  3),
+    204: ('ss', 2, True,  3),
+    205: ('ss', 3, True,  3),
+    166: ('ss', 0, True,  2),
+    167: ('ss', 1, True,  2),
+    168: ('ss', 2, True,  2),
+    169: ('ss', 3, True,  2),
+    130: ('ss', 0, True,  0),
+    131: ('ss', 1, True,  0),
+    132: ('ss', 2, True,  0),
+    133: ('ss', 3, True,  0),
+
+    210: ('dog', 0, True, 3),
+    211: ('dog', 1, True, 3),
+    212: ('dog', 2, True, 3),
+    213: ('dog', 3, True, 3),
+    174: ('dog', 0, True, 2),
+    175: ('dog', 1, True, 2),
+    176: ('dog', 2, True, 2),
+    177: ('dog', 3, True, 2),
+    138: ('dog', 0, True, 0),
+    139: ('dog', 1, True, 0),
+    140: ('dog', 2, True, 0),
+    141: ('dog', 3, True, 0),
+
+    252: ('mutant', 0, False, 3),
+    253: ('mutant', 1, False, 3),
+    254: ('mutant', 2, False, 3),
+    255: ('mutant', 3, False, 3),
+    234: ('mutant', 0, False, 2),
+    235: ('mutant', 1, False, 2),
+    236: ('mutant', 2, False, 2),
+    237: ('mutant', 3, False, 2),
+    216: ('mutant', 0, False, 0),
+    217: ('mutant', 1, False, 0),
+    218: ('mutant', 2, False, 0),
+    219: ('mutant', 3, False, 0),
+    256: ('mutant', 0, True,  3),
+    257: ('mutant', 1, True,  3),
+    258: ('mutant', 2, True,  3),
+    259: ('mutant', 3, True,  3),
+    238: ('mutant', 0, True,  2),
+    239: ('mutant', 1, True,  2),
+    240: ('mutant', 2, True,  2),
+    241: ('mutant', 3, True,  2),
+    220: ('mutant', 0, True,  0),
+    221: ('mutant', 1, True,  0),
+    222: ('mutant', 2, True,  0),
+    223: ('mutant', 3, True,  0),
+}
+
+
+TILEMAP_MUSIC_LABELS = [
     'GETTHEM_MUS',
     'SEARCHN_MUS',
     'POW_MUS',
@@ -1965,13 +2023,13 @@ MAP_TILEMAP_MUSIC_LABELS = [
     'FUNKYOU_MUS',
 ]
 
-MAP_TILEMAP_MUSIC_INDICES = [MUSIC_LABELS.index(label) for label in MAP_TILEMAP_MUSIC_LABELS]
+TILEMAP_MUSIC_INDICES = [MUSIC_LABELS.index(label) for label in TILEMAP_MUSIC_LABELS]
 
 # TODO: make map descriptor instead of dedicated arrays
 
-MAP_FLOOR_COLORS = [0x19] * (10 * 6)
+FLOOR_COLORS = [0x19] * (10 * 6)
 
-MAP_CEILING_COLORS = [
+CEILING_COLORS = [
     0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0xBF,
     0x4E, 0x4E, 0x4E, 0x1D, 0x8D, 0x4E, 0x1D, 0x2D, 0x1D, 0x8D,
     0x1D, 0x1D, 0x1D, 0x1D, 0x1D, 0x2D, 0xDD, 0x1D, 0x1D, 0x98,
