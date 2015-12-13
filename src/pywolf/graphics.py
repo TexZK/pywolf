@@ -7,6 +7,8 @@ import struct
 
 from PIL import Image
 
+from pywolf.utils import stream_pack_array
+
 from .utils import (stream_write, stream_pack, stream_unpack, stream_unpack_array,
                     BinaryResource, ResourceManager)
 
@@ -230,6 +232,10 @@ class SpriteHeader(BinaryResource):
         offsets = list(stream_unpack_array('<H', chunk_stream, width))
         return cls(left, right, offsets)
 
+    def to_stream(self, stream):
+        stream_pack(stream, '<HH', self.left, self.right)
+        stream_pack_array(stream, '<H', self.offsets)
+
 
 class Sprite(object):
 
@@ -238,13 +244,13 @@ class Sprite(object):
 
         self.dimensions = dimensions
         self.image = image
+        self.alpha_index = alpha_index
 
 
 class SpriteManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None,
-                 cache=None, alpha_index=ALPHA_INDEX):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None, alpha_index=ALPHA_INDEX):
+        super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._dimensions = dimensions
         self._alpha_index = alpha_index
@@ -275,9 +281,14 @@ class FontHeader(BinaryResource):
     @classmethod
     def from_stream(cls, chunk_stream):
         height = stream_unpack('<H', chunk_stream)[0]
-        locations = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
+        offsets = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
         widths = list(stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT))
-        return cls(height, locations, widths)
+        return cls(height, offsets, widths)
+
+    def to_stream(self, chunk_stream):
+        stream_pack(chunk_stream, '<H', self.height)
+        stream_pack_array(chunk_stream, '<H', self.locations)
+        stream_pack_array(chunk_stream, '<B', self.widths)
 
 
 class Font(object):
@@ -344,7 +355,7 @@ class FontManager(ResourceManager):
         palette = self._palette
         alpha_index = self._alpha_index
 
-        header = FontHeader.from_stream(io.BytesIO(chunk))
+        header = FontHeader.from_bytes(chunk)
         character_count = type(header).CHARACTER_COUNT
         height = header.height
         assert 0 < height
@@ -376,13 +387,7 @@ class DOSScreenManager(ResourceManager):
         return DOSScreen(chunk)
 
 
-class HelpArtManager(ResourceManager):
-
-    def _build_resource(self, index, chunk):
-        return chunk.decode('ascii')
-
-
-class EndArtManager(ResourceManager):
+class TextArtManager(ResourceManager):
 
     def _build_resource(self, index, chunk):
         return chunk.decode('ascii')

@@ -2,13 +2,13 @@
 @author: Andrea Zoppi
 '''
 
-import unittest
-import sys
 import logging
+import sys
+import unittest
 
-import pywolf.persistence
-import pywolf.graphics
 import pywolf.configs.wl6
+import pywolf.graphics
+import pywolf.persistence
 
 
 class Test(unittest.TestCase):
@@ -184,7 +184,7 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
         ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
             graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
-            helpart_manager = pywolf.graphics.HelpArtManager(graphics_chunks_handler, start, count)
+            helpart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
             for i, helpart in enumerate(helpart_manager):
                 path = r'./outputs/helpart_{}.txt'.format(i)
@@ -205,7 +205,7 @@ class Test(unittest.TestCase):
         ),   open(r'../data/wl6/vgagraph.wl6', 'rb') as (data_file
         ),   open(r'../data/wl6/vgadict.wl6', 'rb') as huffman_file:
             graphics_chunks_handler.load(data_file, header_file, huffman_file, partition_map)
-            endart_manager = pywolf.graphics.EndArtManager(graphics_chunks_handler, start, count)
+            endart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
             for i, endart in enumerate(endart_manager):
                 path = r'./outputs/endart_{}.txt'.format(i)

@@ -283,7 +283,7 @@ class BinaryResource(object):
         return stream.getvalue()
 
 
-class ResourceManager(object):
+class ResourceManager(object):  # TODO: remove cache
 
     def __init__(self, chunks_handler, start=None, count=None, cache=None):
         if start is None:

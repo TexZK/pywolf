@@ -6,11 +6,11 @@ import io
 import logging
 import struct
 
+from .game import TileMapHeader
 from .utils import (stream_bound, stream_read, stream_unpack, stream_unpack_array,
                     sequence_index, sequence_getitem,
                     huffman_expand, carmack_expand, rlew_expand,
                     HUFFMAN_NODES_COUNT)
-from .game import TileMapHeader
 
 
 class ChunksHandler(object):
@@ -44,7 +44,7 @@ class ChunksHandler(object):
 
         data_stream.seek(data_base + offset)
 
-    def load(self, data_stream, data_base=0, data_size=None):
+    def load(self, data_stream, data_base=None, data_size=None):
         logger = logging.getLogger()
         self.clear()
 
@@ -106,15 +106,6 @@ class VSwapChunksHandler(ChunksHandler):
         self._pages_size = None
         self.sprites_start = None
         self.sounds_start = None
-
-    def _seek(self, index, offsets=None):
-        data_stream = self._data_stream
-        data_base = self._data_base
-        if offsets is None:
-            offset = self._offsetof(index)
-        else:
-            offset = offsets[sequence_index(index, len(offsets))]
-        data_stream.seek(data_base + offset)
 
     def load(self, data_stream, data_base=None, data_size=None, dimensions=(64, 64), alpha_index=0xFF):
         super().load(data_stream, data_base, data_size)
@@ -268,7 +259,7 @@ class GraphicsChunksHandler(ChunksHandler):
         self._partition_map = {}
         self._pics_dimensions_index = None
         self._huffman_nodes = ()
-        self.dimensions = ()
+        self.pics_dimensions = ()
 
     def _seek(self, index, offsets=None):
         data_stream = self._data_stream
@@ -454,17 +445,14 @@ class MapChunksHandler(ChunksHandler):  # TODO
 
     def extract_chunk(self, index):
         self._log_extract_chunk(index)
-        chunk_count = self._chunk_count
-        chunk_offsets = self._chunk_offsets
         data_stream = self._data_stream
         carmacized = self._carmacized
         rlew_tag = self._rlew_tag
         planes_count = self.planes_count
-        index = sequence_index(index, chunk_count)
 
         header = None
         planes = [None] * planes_count
-        chunk_size = chunk_offsets[index + 1] - chunk_offsets[index]
+        chunk_size = self._sizeof(index)
         if chunk_size:
             self._seek(index)
             header = TileMapHeader.from_stream(data_stream, planes_count)
