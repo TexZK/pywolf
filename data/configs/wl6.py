@@ -2,7 +2,7 @@
 @author: Andrea Zoppi
 '''
 
-from ..graphics import rgbpalette_flatten
+from pywolf.graphics import rgbpalette_flatten
 
 
 GRAPHICS_PARTITIONS_MAP = {
@@ -1747,7 +1747,7 @@ MUSIC_NAMES = [
 
 
 TILE_PARTITION_MAP = {
-    'wall':             (  1,  48),
+    'wall':             (  1,  49),
 
     'door_panel':       ( 50,   1),
     'door_hinge':       ( 51,   1),
@@ -1780,7 +1780,7 @@ ENTITY_PARTITION_MAP = {  # TODO
     'turn':         ( 90,   8),
     'pushwall':     ( 98,   1),
     'endgame':      ( 99,   1),
-    'object':       ( 23,  47),
+    'object':       ( 23,  48),
     'enemy':        (100, 200),  # broad range
     'dead_guard':   (124,   1),  # inside of enemies, whatever...
 }
@@ -1813,6 +1813,7 @@ ENTITY_OBJECT_MAP = {
     60: 'well',
     61: 'blood_pool',
     62: 'flag',
+    63: 'aardwolf',
     64: 'bones_2',
     65: 'bones_3',
     66: 'bones_4',
@@ -2038,3 +2039,102 @@ CEILING_COLORS = [
     0x1D, 0x1D, 0x1D, 0x1D, 0xDD, 0xDD, 0x7D, 0xDD, 0xDD, 0xDD,
 ]
 
+
+STATIC_OBJECT_NAMES = [
+    'armor',
+    'barrel',
+    'basket',
+    'bed',
+    'blood_pool',
+    'bones__blood',
+    'bones_1',
+    'bones_2',
+    'bones_3',
+    'bones_4',
+    'bones_5',
+    'brown_plant',
+    'cage',
+    'cage__skeleton',
+    'ceiling_light',
+    'chandelier',
+    'flag',
+    'green_plant',
+    'guard__dead',
+    'hanging_skeleton',
+    'lamp',
+    'oil_drum',
+    'pillar',
+    'rack',
+    'sink',
+    'skeleton',
+    'stove',
+    'table',
+    'table__chairs',
+    'utensils_blue',
+    'utensils_brown',
+    'vase',
+    'vines',
+    'water_pool',
+    'well',
+    'well__water',
+]
+
+SOLID_OBJECT_NAMES = [
+    'armor',
+    'barrel',
+    'bed',
+    'brown_plant',
+    'cage',
+    'cage__skeleton',
+    'flag',
+    'green_plant',
+    'hanging_skeleton',
+    'lamp',
+    'oil_drum',
+    'pillar',
+    'rack',
+    'sink',
+    'stove',
+    'table',
+    'table__chairs',
+    'vase',
+    'well',
+    'well__water',
+]
+
+COLLECTABLE_OBJECT_NAMES = [
+    'ammo',
+    'chaingun',
+    'chalice',
+    'cross',
+    'crown',
+    'dog_food',
+    'extra_life',
+    'food',
+    'gold_key',
+    'jewels',
+    'machinegun',
+    'medkit',
+    'silver_key',
+]
+
+ENEMY_NAMES = [
+    'dog',
+    'fettgesicht',
+    'ghost_blinky',
+    'ghost_clyde',
+    'ghost_inky',
+    'ghost_pinky',
+    'gretel',
+    'guard',
+    'hans',
+    'hitler',
+    'mecha_hitler',
+    'mutant',
+    'needle',
+    'officer',
+    'otto',
+    'robed_fake',
+    'schabbs',
+    'ss',
+]

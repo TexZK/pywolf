@@ -7,10 +7,8 @@ import struct
 
 from PIL import Image
 
-from pywolf.utils import stream_pack_array
-
-from .utils import (stream_write, stream_pack, stream_unpack, stream_unpack_array,
-                    BinaryResource, ResourceManager)
+from pywolf.utils import (stream_write, stream_pack, stream_unpack, stream_pack_array, stream_unpack_array,
+                          BinaryResource, ResourceManager)
 
 
 ALPHA_INDEX = 0xFF

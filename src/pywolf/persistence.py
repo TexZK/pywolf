@@ -6,11 +6,11 @@ import io
 import logging
 import struct
 
-from .game import TileMapHeader
-from .utils import (stream_bound, stream_read, stream_unpack, stream_unpack_array,
-                    sequence_index, sequence_getitem,
-                    huffman_expand, carmack_expand, rlew_expand,
-                    HUFFMAN_NODES_COUNT)
+from pywolf.game import TileMapHeader
+from pywolf.utils import (stream_bound, stream_read, stream_unpack, stream_unpack_array,
+                          sequence_index, sequence_getitem,
+                          huffman_expand, carmack_expand, rlew_expand,
+                          HUFFMAN_NODES_COUNT)
 
 
 class ChunksHandler(object):

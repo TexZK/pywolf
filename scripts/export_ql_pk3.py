@@ -18,12 +18,10 @@ from PIL import Image
 
 from export_rtcw_pk3 import write_static_shaders
 from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave
-import pywolf.configs.wl6 as CONFIG_WL6
-from pywolf.game import COLLECTABLE_OBJECT_NAMES, STATIC_OBJECT_NAMES, SOLID_OBJECT_NAMES
 import pywolf.game
 from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
-from pywolf.utils import find_partition
+from pywolf.utils import find_partition, load_as_module
 
 
 IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav.exe')
@@ -125,6 +123,41 @@ def build_cuboid_vertices(extreme_a, extreme_b):
             [(xb, yb, za), (xa, yb, za), (xa, ya, za), (xb, ya, za)]]
 
 
+def textify_things(things):  # TODO
+    lines = []
+
+    if hasattr(things, 'items'):
+        lines.append('{')
+        sub_things = []
+
+        for key, value in things.items():
+            if key is None:
+                sub_things.extend(value)
+            else:
+                tokens = [str(key)]
+                if not hasattr(value, '__iter__') or isinstance(value, (str, tuple)):
+                    value = [value]
+
+                for token in value:
+                    if isinstance(token, str):
+                        token = '"' + token + '"'
+                    elif hasattr(value, '__iter__'):
+                        token = ' '.join(['('] + map(str, value) + [')'])
+                    else:
+                        token = str(token)
+                    tokens.append(token)
+
+                lines.append(' '.join(tokens))
+
+        lines += textify_things(sub_things)
+        lines.append('}')
+
+    else:
+        lines += (textify_things(thing) for thing in things)
+
+    return '\n'.join(lines)
+
+
 def describe_cuboid_brush(face_vertices, face_shaders, shader_scales, format_line=None,
                           flip_directions=(NORTH, WEST), content_flags=None, surface_flags=None):
     if format_line is None:
@@ -156,9 +189,9 @@ def describe_cuboid_brush(face_vertices, face_shaders, shader_scales, format_lin
 
 class MapExporter(object):  # TODO
 
-    def __init__(self, params, config, tilemap, tilemap_index):
+    def __init__(self, params, cfg, tilemap, tilemap_index):
         self.params = params
-        self.config = config
+        self.cfg = cfg
         self.tilemap = tilemap
         self.tilemap_index = tilemap_index
 
@@ -208,7 +241,7 @@ class MapExporter(object):  # TODO
 
     def describe_area_brushes(self, tile_coords):  # TODO: support for all floor/ceiling modes of ChaosEdit
         params = self.params
-        config = self.config
+        cfg = self.cfg
         tilemap_index = self.tilemap_index
         tile_units = params.tile_units
         format_palette_texture = '{}_palette/color_0x{:02x}'.format
@@ -220,7 +253,7 @@ class MapExporter(object):  # TODO
             'common/caulk',
             'common/caulk',
             'common/caulk',
-            format_palette_texture(params.short_name, config.CEILING_COLORS[tilemap_index]),
+            format_palette_texture(params.short_name, cfg.CEILING_COLORS[tilemap_index]),
         ]
         offsets = list(self.unit_offsets)
         offsets[2] += tile_units
@@ -231,7 +264,7 @@ class MapExporter(object):  # TODO
             'common/caulk',
             'common/caulk',
             'common/caulk',
-            format_palette_texture(params.short_name, config.FLOOR_COLORS[tilemap_index]),
+            format_palette_texture(params.short_name, cfg.FLOOR_COLORS[tilemap_index]),
             'common/caulk',
         ]
         offsets = list(self.unit_offsets)
@@ -242,12 +275,12 @@ class MapExporter(object):  # TODO
 
     def describe_wall_brush(self, tile_coords):
         params = self.params
-        config = self.config
+        cfg = self.cfg
         tilemap = self.tilemap
         x, y = tile_coords
         tile = tilemap[x, y]
-        partition_map = config.TILE_PARTITION_MAP
-        pushwall_entity = config.ENTITY_PARTITION_MAP['pushwall'][0]
+        partition_map = cfg.TILE_PARTITION_MAP
+        pushwall_entity = cfg.ENTITY_PARTITION_MAP['pushwall'][0]
         face_shaders = []
 
         for direction, displacement in enumerate(DIR_TO_DISPL[:4]):
@@ -271,7 +304,7 @@ class MapExporter(object):  # TODO
                     else:
                         raise ValueError((tile_coords, facing_partition))
 
-                    shader = '{}_wall/{}__{}'.format(params.short_name, config.TEXTURE_NAMES[texture],
+                    shader = '{}_wall/{}__{}'.format(params.short_name, cfg.TEXTURE_NAMES[texture],
                                                      (direction & 1))
             face_shaders.append(shader)
 
@@ -284,12 +317,12 @@ class MapExporter(object):  # TODO
 
     def describe_sprite(self, tile_coords):
         params = self.params
-        config = self.config
+        cfg = self.cfg
         entity = self.tilemap[tile_coords][1]
-        name = config.ENTITY_OBJECT_MAP[entity]
+        name = cfg.ENTITY_OBJECT_MAP[entity]
         lines = []
 
-        if name in SOLID_OBJECT_NAMES:
+        if name in cfg.SOLID_OBJECT_NAMES:
             face_shaders = ['common/clip'] * 6
             lines.extend(self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets))
 
@@ -300,9 +333,9 @@ class MapExporter(object):  # TODO
 
     def describe_door(self, tile_coords):
         params = self.params
-        config = self.config
+        cfg = self.cfg
         tile = self.tilemap[tile_coords][0]
-        _, texture_name, vertical = config.DOOR_MAP[tile]
+        _, texture_name, vertical = cfg.DOOR_MAP[tile]
         center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
         half = self.params.tile_units / 2
         shader_scales = [self.params.shader_scale, self.params.shader_scale]
@@ -398,9 +431,9 @@ class MapExporter(object):  # TODO
                 door_begin + door_brush + door_underworld_brush + door_end)
 
     def describe_door_hint(self, tile_coords):
-        config = self.config
+        cfg = self.cfg
         tile = self.tilemap[tile_coords][0]
-        vertical = config.DOOR_MAP[tile][2]
+        vertical = cfg.DOOR_MAP[tile][2]
         center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
         half = self.params.tile_units / 2
         shader_scales = [self.params.shader_scale, self.params.shader_scale]
@@ -486,11 +519,11 @@ class MapExporter(object):  # TODO
 
     def describe_worldspawn(self):
         params = self.params
-        config = self.config
+        cfg = self.cfg
         dimensions = self.tilemap.dimensions
         tilemap = self.tilemap
-        pushwall_entity = config.ENTITY_PARTITION_MAP['pushwall'][0]
-        music_name = config.MUSIC_NAMES[config.TILEMAP_MUSIC_INDICES[self.tilemap_index]].replace(' ', '_')
+        pushwall_entity = cfg.ENTITY_PARTITION_MAP['pushwall'][0]
+        music_name = cfg.MUSIC_NAMES[cfg.TILEMAP_MUSIC_INDICES[self.tilemap_index]].replace(' ', '_')
 
         lines = [
             '{',
@@ -510,7 +543,7 @@ class MapExporter(object):  # TODO
                 tile = tilemap[tile_coords]
 
                 if tile[0]:
-                    partition = find_partition(tile[0], config.TILE_PARTITION_MAP, count_sign=1)
+                    partition = find_partition(tile[0], cfg.TILE_PARTITION_MAP, count_sign=1)
                     lines.append('// {} @ {!r} = tile 0x{:04X}'.format(partition, tile_coords, tile[0]))
 
                     if (partition in ('floor', 'door', 'door_silver', 'door_gold', 'door_elevator') or
@@ -521,13 +554,13 @@ class MapExporter(object):  # TODO
                     else:
                         raise ValueError((tile_coords, partition))
 
-                    if tile[0] in config.DOOR_MAP:
+                    if tile[0] in cfg.DOOR_MAP:
                         lines.append('// {} @ {!r} = door 0x{:04X}, hint'.format(partition, tile_coords, tile[0]))
                         lines += self.describe_door_hint(tile_coords)
 
                 if tile[1]:
-                    object_name = config.ENTITY_OBJECT_MAP.get(tile[1])
-                    if object_name in STATIC_OBJECT_NAMES:
+                    object_name = cfg.ENTITY_OBJECT_MAP.get(tile[1])
+                    if object_name in cfg.STATIC_OBJECT_NAMES:
                         lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
                         lines += self.describe_sprite(tile_coords)
 
@@ -541,13 +574,13 @@ class MapExporter(object):  # TODO
         return lines
 
     def compute_progression_field(self, player_start_tile_coords):
-        config = self.config
+        cfg = self.cfg
         tilemap = self.tilemap
         dimensions = tilemap.dimensions
 
-        wall_start = config.TILE_PARTITION_MAP['wall'][0]
-        wall_endex = wall_start + config.TILE_PARTITION_MAP['wall'][1]
-        pushwall_entity = config.ENTITY_PARTITION_MAP['pushwall'][0]
+        wall_start = cfg.TILE_PARTITION_MAP['wall'][0]
+        wall_endex = wall_start + cfg.TILE_PARTITION_MAP['wall'][1]
+        pushwall_entity = cfg.ENTITY_PARTITION_MAP['pushwall'][0]
 
         field = {(x, y): 0 for y in range(dimensions[1]) for x in range(dimensions[0])}
         visited = {(x, y) : False for y in range(dimensions[1]) for x in range(dimensions[0])}
@@ -565,8 +598,8 @@ class MapExporter(object):  # TODO
                     facing_coords = (x + xd, y + yd)
                     facing_tile = tilemap.get(facing_coords)
                     if facing_tile is not None:
-                        object_name = config.ENTITY_OBJECT_MAP.get(facing_tile[1])
-                        if (not visited[facing_coords] and object_name not in SOLID_OBJECT_NAMES and
+                        object_name = cfg.ENTITY_OBJECT_MAP.get(facing_tile[1])
+                        if (not visited[facing_coords] and object_name not in cfg.SOLID_OBJECT_NAMES and
                             (not (wall_start <= facing_tile[0] < wall_endex) or facing_tile[1] == pushwall_entity)):
                             border_tiles.append(facing_coords)
                             field_value |= (1 << direction)
@@ -577,7 +610,7 @@ class MapExporter(object):  # TODO
 
     def describe_player_start(self, tile_coords):
         tile = self.tilemap[tile_coords]
-        index = tile[1] - self.config.ENTITY_PARTITION_MAP['start'][0]
+        index = tile[1] - self.cfg.ENTITY_PARTITION_MAP['start'][0]
         origin = self.center_units(tile_coords, self.unit_offsets)
         origin[2] += 32
 
@@ -601,7 +634,7 @@ class MapExporter(object):  # TODO
 
     def describe_turn(self, tile_coords, turn_coords):
         tilemap = self.tilemap
-        index = tilemap[tile_coords][1] - self.config.ENTITY_PARTITION_MAP['turn'][0]
+        index = tilemap[tile_coords][1] - self.cfg.ENTITY_PARTITION_MAP['turn'][0]
         origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
         step = TURN_TO_DISPL[index]
         target_coords = [(tile_coords[0] + step[0]), (tile_coords[1] + step[1])]
@@ -634,11 +667,11 @@ class MapExporter(object):  # TODO
         return lines
 
     def describe_enemy(self, tile_coords, turn_tiles):
-        config = self.config
+        cfg = self.cfg
         params = self.params
         tilemap = self.tilemap
         tile = tilemap.get(tile_coords)
-        enemy = config.ENEMY_MAP.get(tile[1])
+        enemy = cfg.ENEMY_MAP.get(tile[1])
 
         if not enemy or not (params.enemy_level_min <= enemy[3] <= params.enemy_level_max):
             return ()
@@ -659,7 +692,7 @@ class MapExporter(object):  # TODO
 
     def describe_pushwall(self, tile_coords, progression_field):  # TODO
         params = self.params
-        config = self.config
+        cfg = self.cfg
         tile = self.tilemap[tile_coords]
         center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
 
@@ -670,7 +703,7 @@ class MapExporter(object):  # TODO
                 xd, yd = DIR_TO_DISPL[move_direction][:2]
                 break
         else:
-            raise ValueError('Pushwall @ ({}) cannot be reached or move'.format(tile_coords))
+            raise ValueError('Pushwall @ {!r} cannot be reached or move'.format(tile_coords))
 
         trigger_begin = [
             '{',
@@ -712,9 +745,9 @@ class MapExporter(object):  # TODO
 
         # Door brush
         face_shaders = []
-        texture = tile[0] - config.TILE_PARTITION_MAP['wall'][0]
+        texture = tile[0] - cfg.TILE_PARTITION_MAP['wall'][0]
         for direction in range(4):
-            shader = '{}_wall/{}__{}'.format(params.short_name, config.TEXTURE_NAMES[texture], (direction & 1))
+            shader = '{}_wall/{}__{}'.format(params.short_name, cfg.TEXTURE_NAMES[texture], (direction & 1))
             face_shaders.append(shader)
         face_shaders += ['common/caulk'] * 2
         door_brush = self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets)
@@ -735,7 +768,7 @@ class MapExporter(object):  # TODO
                 door_begin + door_brush + door_underworld_brush + door_end)
 
     def describe_entities(self):  # TODO
-        config = self.config
+        cfg = self.cfg
         tilemap = self.tilemap
         dimensions = tilemap.dimensions
         lines = []
@@ -750,7 +783,7 @@ class MapExporter(object):  # TODO
                 tile = tilemap[tile_coords]
 
                 if tile[1]:
-                    partition = find_partition(tile[1], config.ENTITY_PARTITION_MAP, count_sign=-1)
+                    partition = find_partition(tile[1], cfg.ENTITY_PARTITION_MAP, count_sign=-1)
                     description = '// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1])
 
                     if partition == 'start':
@@ -769,12 +802,13 @@ class MapExporter(object):  # TODO
                     elif partition == 'pushwall':
                         pushwall_list.append([description, tile_coords])
 
-                    elif partition == 'object' and config.ENTITY_OBJECT_MAP[tile[1]] in COLLECTABLE_OBJECT_NAMES:
+                    elif partition == 'object' and cfg.ENTITY_OBJECT_MAP[tile[1]] in cfg.COLLECTABLE_OBJECT_NAMES:
                         lines.append(description)
                         lines += self.describe_object(tile_coords)
 
                 if tile[0]:
-                    if tile[0] in config.DOOR_MAP:
+                    partition = find_partition(tile[0], cfg.TILE_PARTITION_MAP, count_sign=-1)
+                    if tile[0] in cfg.DOOR_MAP:
                         lines.append('// {} @ {!r} = door 0x{:04X}'.format(partition, tile_coords, tile[0]))
                         lines += self.describe_door(tile_coords)
 
@@ -785,9 +819,9 @@ class MapExporter(object):  # TODO
             lines += self.describe_pushwall(tile_coords, progression_field)
 
         turn_list_entities = [turn[1] for turn in turn_list]
-        for description, tile_coords in turn_list:
-            lines.append(description)
-            lines += self.describe_turn(tile_coords, turn_list_entities)
+#         for description, tile_coords in turn_list:
+#             lines.append(description)
+#             lines += self.describe_turn(tile_coords, turn_list_entities)
 
         for description, tile_coords in enemy_list:
             lines.append(description)
@@ -828,9 +862,9 @@ def build_argument_parser():
     group.add_argument('--output-pk3', required=True)
 
     group = parser.add_argument_group('settings')
-    group.add_argument('--config', default='wl6')
+    group.add_argument('--cfg', required=True)
     group.add_argument('--short-name', default='wolf3d')
-    group.add_argument('--author', default='\u00A9 id Software')
+    group.add_argument('--author', default='(c) id Software')
     group.add_argument('--author2')
     group.add_argument('--wave-rate', default=44100, type=int)
     group.add_argument('--imf-rate', default=700, type=int)
@@ -858,20 +892,20 @@ def _sep():
     logger.info('-' * 80)
 
 
-def export_textures(params, config, zip_file, vswap_chunks_handler):
+def export_textures(params, cfg, zip_file, vswap_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting textures')
 
     start = 0
     count = vswap_chunks_handler.sprites_start - start
     texture_manager = pywolf.graphics.TextureManager(vswap_chunks_handler,
-                                                     config.GRAPHICS_PALETTE_MAP[...],
-                                                     config.SPRITE_DIMENSIONS,
+                                                     cfg.GRAPHICS_PALETTE_MAP[...],
+                                                     cfg.SPRITE_DIMENSIONS,
                                                      start, count)
-    scaled_size = [side * params.texture_scale for side in config.TEXTURE_DIMENSIONS]
+    scaled_size = [side * params.texture_scale for side in cfg.TEXTURE_DIMENSIONS]
 
     for i, texture in enumerate(texture_manager):
-        name = config.TEXTURE_NAMES[i >> 1]
+        name = cfg.TEXTURE_NAMES[i >> 1]
         path = 'textures/{}_wall/{}__{}.tga'.format(params.short_name, name, (i & 1))
         logger.info('Texture [%d/%d]: %r', (i + 1), count, path)
         image = texture.image.transpose(Image.FLIP_TOP_BOTTOM).resize(scaled_size).convert('RGB')
@@ -880,63 +914,63 @@ def export_textures(params, config, zip_file, vswap_chunks_handler):
         write_targa_bgrx(texture_stream, scaled_size, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
 
-    palette = config.GRAPHICS_PALETTE
+    palette = cfg.GRAPHICS_PALETTE
     for i, color in enumerate(palette):
         path = 'textures/{}_palette/color_0x{:02x}.tga'.format(params.short_name, i)
         logger.info('Texture palette color [%d/%d]: %r, (0x%02X, 0x%02X, 0x%02X)',
                     (i + 1), len(palette), path, *color)
-        image = build_color_image(config.TEXTURE_DIMENSIONS, color)
+        image = build_color_image(cfg.TEXTURE_DIMENSIONS, color)
         image = image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
         pixels_bgr = bytes(x for pixel in image.getdata() for x in reversed(pixel))
         texture_stream = io.BytesIO()
-        write_targa_bgrx(texture_stream, config.TEXTURE_DIMENSIONS, 24, pixels_bgr)
+        write_targa_bgrx(texture_stream, cfg.TEXTURE_DIMENSIONS, 24, pixels_bgr)
         zip_file.writestr(path, texture_stream.getbuffer())
 
     logger.info('Done')
     _sep()
 
 
-def write_texture_shaders(params, config, shader_file, palette_shaders=True):
-    for name in config.TEXTURE_NAMES:
+def write_texture_shaders(params, cfg, shader_file, palette_shaders=True):
+    for name in cfg.TEXTURE_NAMES:
         for j in range(2):
             shader_name = 'textures/{}_wall/{}__{}'.format(params.short_name, name, j)
             path = shader_name + '.tga'
             shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
     if palette_shaders:
-        palette = config.GRAPHICS_PALETTE
+        palette = cfg.GRAPHICS_PALETTE
         for i in range(len(palette)):
             shader_name = 'textures/{}_palette/color_0x{:02x}'.format(params.short_name, i)
             path = shader_name + '.tga'
             shader_file.write(TEXTURE_SHADER_TEMPLATE.format(shader_name, path))
 
 
-def write_static_shaders(params, config, shader_file):
-    for name in STATIC_OBJECT_NAMES:
+def write_static_shaders(params, cfg, shader_file):
+    for name in cfg.STATIC_OBJECT_NAMES:
         shader_name = 'textures/{}_static/{}'.format(params.short_name, name)
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         shader_file.write(SPRITE_SHADER_TEMPLATE.format(shader_name, path))
 
 
-def write_collectable_shaders(params, config, shader_file):
-    for name in COLLECTABLE_OBJECT_NAMES:
+def write_collectable_shaders(params, cfg, shader_file):
+    for name in cfg.COLLECTABLE_OBJECT_NAMES:
         shader_name = 'textures/{}_collectable/{}'.format(params.short_name, name)
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         shader_file.write(SPRITE_SHADER_TEMPLATE.format(shader_name, path))
 
 
-def write_enemy_shaders(params, config, shader_file):
-    ignored_names = STATIC_OBJECT_NAMES + COLLECTABLE_OBJECT_NAMES
-    names = [name for name in config.SPRITE_NAMES if name not in ignored_names]
+def write_enemy_shaders(params, cfg, shader_file):
+    ignored_names = cfg.STATIC_OBJECT_NAMES + cfg.COLLECTABLE_OBJECT_NAMES
+    names = [name for name in cfg.SPRITE_NAMES if name not in ignored_names]
     for name in names:
         shader_name = 'textures/{}_enemy/{}'.format(params.short_name, name)
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         shader_file.write(SPRITE_SHADER_TEMPLATE.format(shader_name, path))
 
 
-def export_shader(params, config, zip_file, script_name, shader_writer):
+def export_shader(params, cfg, zip_file, script_name, shader_writer):
     shader_text_stream = io.StringIO()
-    shader_writer(params, config, shader_text_stream)
+    shader_writer(params, cfg, shader_text_stream)
     shader_text = shader_text_stream.getvalue()
 
     zip_file.writestr('scripts/{}'.format(script_name), shader_text.encode())
@@ -947,7 +981,7 @@ def export_shader(params, config, zip_file, script_name, shader_writer):
         shader_file.write(shader_text)
 
 
-def export_shaders(params, config, zip_file):
+def export_shaders(params, cfg, zip_file):
     logger = logging.getLogger()
     logger.info('Exporting shaders')
 
@@ -959,7 +993,7 @@ def export_shaders(params, config, zip_file):
     }
 
     for script_name, shader_writer in script_writer_map.items():
-        export_shader(params, config, zip_file, script_name, shader_writer)
+        export_shader(params, cfg, zip_file, script_name, shader_writer)
 
     logger.info('Done')
     _sep()
@@ -988,20 +1022,20 @@ def fix_sprite_halo(rgba_image, alpha_layer):  # TODO: optimize with numpy array
     return rgba_image
 
 
-def export_sprites(params, config, zip_file, vswap_chunks_handler):
+def export_sprites(params, cfg, zip_file, vswap_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting sprites')
 
     start = vswap_chunks_handler.sprites_start
     count = vswap_chunks_handler.sounds_start - start
     sprite_manager = pywolf.graphics.SpriteManager(vswap_chunks_handler,
-                                                   config.GRAPHICS_PALETTE_MAP[...],
-                                                   config.SPRITE_DIMENSIONS,
+                                                   cfg.GRAPHICS_PALETTE_MAP[...],
+                                                   cfg.SPRITE_DIMENSIONS,
                                                    start, count, params.alpha_index)
-    scaled_size = [side * params.texture_scale for side in config.SPRITE_DIMENSIONS]
+    scaled_size = [side * params.texture_scale for side in cfg.SPRITE_DIMENSIONS]
 
     for i, sprite in enumerate(sprite_manager):
-        name = config.SPRITE_NAMES[i]
+        name = cfg.SPRITE_NAMES[i]
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
         logger.info('Sprite [%d/%d]: %r', (i + 1), count, path)
         image = sprite.image.convert('RGBA')
@@ -1021,17 +1055,17 @@ def export_sprites(params, config, zip_file, vswap_chunks_handler):
     _sep()
 
 
-def export_pictures(params, config, zip_file, graphics_chunks_handler):
+def export_pictures(params, cfg, zip_file, graphics_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting pictures')
 
-    partitions_map = config.GRAPHICS_PARTITIONS_MAP
-    palette_map = config.GRAPHICS_PALETTE_MAP
+    partitions_map = cfg.GRAPHICS_PARTITIONS_MAP
+    palette_map = cfg.GRAPHICS_PALETTE_MAP
     start, count = partitions_map['pics']
     picture_manager = pywolf.graphics.PictureManager(graphics_chunks_handler, palette_map, start, count)
 
     for i, picture in enumerate(picture_manager):
-        path = 'gfx/{}/{}.tga'.format(params.short_name, config.PICTURE_NAMES[i])
+        path = 'gfx/{}/{}.tga'.format(params.short_name, cfg.PICTURE_NAMES[i])
         logger.info('Picture [%d/%d]: %r', (i + 1), count, path)
         top_bottom_rgb_image = picture.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
         pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
@@ -1043,17 +1077,17 @@ def export_pictures(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
-def export_tile8(params, config, zip_file, graphics_chunks_handler):
+def export_tile8(params, cfg, zip_file, graphics_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting tile8')
 
-    partitions_map = config.GRAPHICS_PARTITIONS_MAP
-    palette_map = config.GRAPHICS_PALETTE_MAP
+    partitions_map = cfg.GRAPHICS_PARTITIONS_MAP
+    palette_map = cfg.GRAPHICS_PALETTE_MAP
     start, count = partitions_map['tile8']
     tile8_manager = pywolf.graphics.Tile8Manager(graphics_chunks_handler, palette_map, start, count)
 
     for i, tile8 in enumerate(tile8_manager):
-        path = 'gfx/{}/tile8__{}.tga'.format(params.short_name, config.TILE8_NAMES[i])
+        path = 'gfx/{}/tile8__{}.tga'.format(params.short_name, cfg.TILE8_NAMES[i])
         logger.info('Tile8 [%d/%d]: %r', (i + 1), count, path)
         top_bottom_rgb_image = tile8.image.transpose(Image.FLIP_TOP_BOTTOM).convert('RGB')
         pixels_bgr = bytes(x for pixel in top_bottom_rgb_image.getdata() for x in reversed(pixel))
@@ -1065,16 +1099,16 @@ def export_tile8(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
-def export_screens(params, config, zip_file, graphics_chunks_handler):
+def export_screens(params, cfg, zip_file, graphics_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting DOS screens')
 
-    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    partitions_map = cfg.GRAPHICS_PARTITIONS_MAP
     start, count = partitions_map['screens']
     screen_manager = pywolf.graphics.DOSScreenManager(graphics_chunks_handler, start, count)
 
     for i, screen in enumerate(screen_manager):
-        path = 'texts/{}/screens/{}.scr'.format(params.short_name, config.SCREEN_NAMES[i])
+        path = 'texts/{}/screens/{}.scr'.format(params.short_name, cfg.SCREEN_NAMES[i])
         logger.info('DOS Screen [%d/%d]: %r', (i + 1), count, path)
         zip_file.writestr(path, screen.data)
 
@@ -1082,11 +1116,11 @@ def export_screens(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
-def export_helparts(params, config, zip_file, graphics_chunks_handler):
+def export_helparts(params, cfg, zip_file, graphics_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting HelpArt texts')
 
-    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    partitions_map = cfg.GRAPHICS_PARTITIONS_MAP
     start, count = partitions_map['helpart']
     helpart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
@@ -1099,11 +1133,11 @@ def export_helparts(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
-def export_endarts(params, config, zip_file, graphics_chunks_handler):
+def export_endarts(params, cfg, zip_file, graphics_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting EndArt texts')
 
-    partitions_map = config.GRAPHICS_PARTITIONS_MAP
+    partitions_map = cfg.GRAPHICS_PARTITIONS_MAP
     start, count = partitions_map['endart']
     endart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
@@ -1116,19 +1150,19 @@ def export_endarts(params, config, zip_file, graphics_chunks_handler):
     _sep()
 
 
-def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
+def export_sampled_sounds(params, cfg, zip_file, vswap_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting sampled sounds')
 
     start = vswap_chunks_handler.sounds_start
     count = len(vswap_chunks_handler.sounds_infos)
     sample_manager = pywolf.audio.SampledSoundManager(vswap_chunks_handler,
-                                                      config.SAMPLED_SOUND_FREQUENCY,
+                                                      cfg.SAMPLED_SOUND_FREQUENCY,
                                                       start, count)
-    scale_factor = params.wave_rate / config.SAMPLED_SOUND_FREQUENCY
+    scale_factor = params.wave_rate / cfg.SAMPLED_SOUND_FREQUENCY
 
     for i, sound in enumerate(sample_manager):
-        name = config.SAMPLED_SOUND_NAMES[i]
+        name = cfg.SAMPLED_SOUND_NAMES[i]
         path = 'sound/{}/sampled/{}.wav'.format(params.short_name, name)
         logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
         samples = bytes(samples_upsample(sound.samples, scale_factor))
@@ -1140,15 +1174,15 @@ def export_sampled_sounds(params, config, zip_file, vswap_chunks_handler):
     _sep()
 
 
-def export_musics(params, config, zip_file, audio_chunks_handler):
+def export_musics(params, cfg, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting musics')
 
-    start, count = config.AUDIO_PARTITIONS_MAP['music']
+    start, count = cfg.AUDIO_PARTITIONS_MAP['music']
 
     for i in range(count):
         chunk_index = start + i
-        name = config.MUSIC_NAMES[i]
+        name = cfg.MUSIC_NAMES[i]
         path = 'music/{}/{}.wav'.format(params.short_name, name)
         logger.info('Music [%d/%d]: %r', (i + 1), count, path)
         imf_chunk = audio_chunks_handler[chunk_index]
@@ -1168,15 +1202,15 @@ def export_musics(params, config, zip_file, audio_chunks_handler):
     _sep()
 
 
-def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
+def export_adlib_sounds(params, cfg, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting AdLib sounds')
 
-    start, count = config.AUDIO_PARTITIONS_MAP['adlib']
+    start, count = cfg.AUDIO_PARTITIONS_MAP['adlib']
     adlib_manager = pywolf.audio.AdLibSoundManager(audio_chunks_handler, start, count)
 
     for i, sound in enumerate(adlib_manager):
-        name = config.ADLIB_SOUND_NAMES[i]
+        name = cfg.ADLIB_SOUND_NAMES[i]
         path = 'sound/{}/adlib/{}.wav'.format(params.short_name, name)
         logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
         imf_chunk = sound.to_imf_chunk()
@@ -1196,15 +1230,15 @@ def export_adlib_sounds(params, config, zip_file, audio_chunks_handler):
     _sep()
 
 
-def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
+def export_buzzer_sounds(params, cfg, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting buzzer sounds')
 
-    start, count = config.AUDIO_PARTITIONS_MAP['buzzer']
+    start, count = cfg.AUDIO_PARTITIONS_MAP['buzzer']
     buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start, count)
 
     for i, sound in enumerate(buzzer_manager):
-        name = config.BUZZER_SOUND_NAMES[i]
+        name = cfg.BUZZER_SOUND_NAMES[i]
         path = 'sound/{}/buzzer/{}.wav'.format(params.short_name, name)
         logger.info('Buzzer sound [%d/%d]: %r', (i + 1), count, path)
         wave_file = io.BytesIO()
@@ -1215,9 +1249,9 @@ def export_buzzer_sounds(params, config, zip_file, audio_chunks_handler):
     _sep()
 
 
-def export_tilemaps(params, config, zip_file, audio_chunks_handler):  # TODO
+def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):  # TODO
     logger = logging.getLogger()
-    logger.info('Exporting tilemaps (Q3Map2 *.map + RTCW *.ai)')
+    logger.info('Exporting tilemaps (Q3Map2 *.map)')
 
     start, count = (0, 60)  # FIXME: replace with map descriptors
     tilemap_manager = pywolf.game.TileMapManager(audio_chunks_handler, start, count)
@@ -1228,17 +1262,13 @@ def export_tilemaps(params, config, zip_file, audio_chunks_handler):  # TODO
         path = os.path.join(folder, (tilemap.name + '.map'))
         logger.info('TileMap [%d/%d]: %r', (i + 1), count, path)
 
-        exporter = MapExporter(params, config, tilemap, i)
+        exporter = MapExporter(params, cfg, tilemap, i)
         description = '\n'.join(exporter.describe_tilemap())
         with open(path, 'wt') as map_file:
             map_file.write(description)
 
         path = 'maps/{}/{}.map'.format(params.short_name, tilemap.name)
         zip_file.writestr(path, description)
-
-        break  # XXX: testing only map 1
-
-        # TODO: *.ai
 
     logger.info('Done')
     _sep()
@@ -1259,7 +1289,7 @@ def main(*args):
         logger.info('%s = %r', key, value)
     _sep()
 
-    config = CONFIG_WL6  # TODO: import from XML?
+    cfg = load_as_module('cfg', params.cfg)
 
     vswap_data_path = os.path.join(params.input_folder, params.vswap_data)
     logger.info('Precaching VSwap chunks: <data>=%r', vswap_data_path)
@@ -1286,8 +1316,7 @@ def main(*args):
     with open(graphics_data_path, 'rb') as (data_file
     ),   open(graphics_header_path, 'rb') as (header_file
     ),   open(graphics_huffman_path, 'rb') as huffman_file:
-        graphics_chunks_handler.load(data_file, header_file, huffman_file,
-                                     config.GRAPHICS_PARTITIONS_MAP)
+        graphics_chunks_handler.load(data_file, header_file, huffman_file, cfg.GRAPHICS_PARTITIONS_MAP)
     _sep()
 
     maps_data_path = os.path.join(params.input_folder, params.maps_data)
@@ -1303,21 +1332,21 @@ def main(*args):
     logger.info('Creating PK3 (ZIP/deflated) file: %r', pk3_path)
     with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:
         _sep()
-        export_tilemaps(params, config, pk3_file, tilemap_chunks_handler)
-        export_shaders(params, config, pk3_file)
-#         export_textures(params, config, pk3_file, vswap_chunks_handler)
-#         export_sprites(params, config, pk3_file, vswap_chunks_handler)
-#        export_fonts(params, config, pk3_file, graphics_chunks_handler)
-#        export_pictures(params, config, pk3_file, graphics_chunks_handler)
-#        export_tile8(params, config, pk3_file, graphics_chunks_handler)
-#        export_screens(params, config, pk3_file, graphics_chunks_handler)
-#        export_helparts(params, config, pk3_file, graphics_chunks_handler)
-#        export_endarts(params, config, pk3_file, graphics_chunks_handler)
+        export_tilemaps(params, cfg, pk3_file, tilemap_chunks_handler)
+        export_shaders(params, cfg, pk3_file)
+#         export_textures(params, cfg, pk3_file, vswap_chunks_handler)
+#         export_sprites(params, cfg, pk3_file, vswap_chunks_handler)
+#        export_fonts(params, cfg, pk3_file, graphics_chunks_handler)
+#        export_pictures(params, cfg, pk3_file, graphics_chunks_handler)
+#        export_tile8(params, cfg, pk3_file, graphics_chunks_handler)
+#        export_screens(params, cfg, pk3_file, graphics_chunks_handler)
+#        export_helparts(params, cfg, pk3_file, graphics_chunks_handler)
+#        export_endarts(params, cfg, pk3_file, graphics_chunks_handler)
 
-#         export_sampled_sounds(params, config, pk3_file, vswap_chunks_handler)
-#         export_musics(params, config, pk3_file, audio_chunks_handler)
-#         export_adlib_sounds(params, config, pk3_file, audio_chunks_handler)
-#         export_buzzer_sounds(params, config, pk3_file, audio_chunks_handler)
+#         export_sampled_sounds(params, cfg, pk3_file, vswap_chunks_handler)
+#         export_musics(params, cfg, pk3_file, audio_chunks_handler)
+#         export_adlib_sounds(params, cfg, pk3_file, audio_chunks_handler)
+#         export_buzzer_sounds(params, cfg, pk3_file, audio_chunks_handler)
 
     logger.info('PK3 archived successfully')
 

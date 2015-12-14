@@ -3,7 +3,10 @@
 '''
 
 import array
+from importlib import import_module
+import importlib.util
 import io
+import os
 import struct
 import sys
 
@@ -13,6 +16,16 @@ HUFFMAN_HEAD_INDEX = HUFFMAN_NODES_COUNT - 1
 
 CARMACK_NEAR_TAG = 0xA7
 CARMACK_FAR_TAG = 0xA8
+
+
+def load_as_module(module_name, path):
+    if os.path.exists(path):
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    else:
+        module = import_module(path)
+    return module
 
 
 def is_in_partition(index, *partitions):
@@ -49,7 +62,9 @@ def find_partition(index, partition_map, count_sign=1):
             start, count = value
             if start <= index < (start + count):
                 return key
-    raise ValueError(key)
+    print(index, count_sign)#XXX
+    print(partition_map)#XXX
+    raise ValueError(index)
 
 
 def huffman_expand(data, expanded_size, nodes):

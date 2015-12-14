@@ -5,147 +5,12 @@
 import array
 import io
 
-from .utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
-                    BinaryResource, ResourceManager)
+from pywolf.utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
+                          BinaryResource, ResourceManager)
 
 
 VERTICAL   = 0
 HORIZONTAL = 1
-
-
-STATIC_OBJECT_NAMES = [
-    'armor',
-    'barrel',
-    'basket',
-    'bed',
-    'blood_pool',
-    'bones__blood',
-    'bones_1',
-    'bones_2',
-    'bones_3',
-    'bones_4',
-    'bones_5',
-    'brown_plant',
-    'cage',
-    'cage__skeleton',
-    'ceiling_light',
-    'chandelier',
-    'flag',
-    'green_plant',
-    'guard__dead',
-    'hanging_skeleton',
-    'lamp',
-    'oil_drum',
-    'pillar',
-    'rack',
-    'sink',
-    'skeleton',
-    'stove',
-    'table',
-    'table__chairs',
-    'utensils_blue',
-    'utensils_brown',
-    'vase',
-    'vines',
-    'water_pool',
-    'well',
-    'well__water',
-]
-
-SOLID_OBJECT_NAMES = [
-    'armor',
-    'barrel',
-    'bed',
-    'brown_plant',
-    'cage',
-    'cage__skeleton',
-    'flag',
-    'green_plant',
-    'hanging_skeleton',
-    'lamp',
-    'oil_drum',
-    'pillar',
-    'rack',
-    'sink',
-    'stove',
-    'table',
-    'table__chairs',
-    'utensils_blue',
-    'utensils_brown',
-    'vase',
-    'well',
-    'well__water',
-]
-
-COLLECTABLE_OBJECT_NAMES = [
-    'ammo',
-    'chaingun',
-    'chalice',
-    'cross',
-    'crown',
-    'dog_food',
-    'extra_life',
-    'food',
-    'gold_key',
-    'jewels',
-    'machinegun',
-    'medkit',
-    'silver_key',
-]
-
-ENEMY_NAMES = [
-    'dog',
-    'fettgesicht',
-    'ghost_blinky',
-    'ghost_clyde',
-    'ghost_inky',
-    'ghost_pinky',
-    'gretel',
-    'guard',
-    'hans',
-    'hitler',
-    'mecha_hitler',
-    'mutant',
-    'needle',
-    'officer',
-    'otto',
-    'robed_fake',
-    'schabbs',
-    'ss',
-]
-
-
-class Entity(object):
-
-    def __init__(self, pose):
-        self.pose = pose
-
-    def think(self):
-        pass
-
-    def on_hit(self, entity):
-        pass
-
-    def get_sprite(self, eye_pose):
-        return None
-
-
-class Player(Entity):
-
-    def __init__(self, pose, health, ammos, team_index):
-        self.pose = pose
-        self.health = health
-        self.ammos = ammos
-        self.team_index = team_index
-
-    def think(self):
-        pass  # TODO
-
-    def on_hit(self):
-        pass  # TODO
-
-    def get_sprite(self, eye_pose):
-        pass  # TODO
 
 
 class TileMapHeader(BinaryResource):
@@ -163,7 +28,11 @@ class TileMapHeader(BinaryResource):
         plane_offsets = tuple(stream_unpack_array('<L', stream, planes_count))
         plane_sizes = tuple(stream_unpack_array('<H', stream, planes_count))
         dimensions = stream_unpack('<HH', stream)
-        name = stream_unpack('<16s', stream)[0].decode('ascii').rstrip(' \t\r\n\v\0')
+        name = stream_unpack('<16s', stream)[0].decode('ascii')
+        null_char_index = name.find('\0')
+        if null_char_index >= 0:
+            name = name[:null_char_index]
+        name = name.rstrip(' \t\r\n\v\0')
         return cls(plane_offsets, plane_sizes, dimensions, name)
 
     def to_stream(self, stream):
