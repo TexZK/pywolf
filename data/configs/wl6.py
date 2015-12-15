@@ -1953,6 +1953,19 @@ ENEMY_MAP = {  # {'name', direction_index, moving, level}
     221: ('mutant', 1, True,  0),
     222: ('mutant', 2, True,  0),
     223: ('mutant', 3, True,  0),
+
+    224: ('ghost_blinky', 4, True, 0),
+    226: ('ghost_pinky',  4, True, 0),
+    225: ('ghost_clyde',  4, True, 0),
+    227: ('ghost_inky',   4, True, 0),
+
+    214: ('hans', 4, True, 0),
+    197: ('gretel', 4, True, 0),
+    179: ('fettgesicht', 4, True, 0),
+    160: ('robed_fake', 4, True, 0),
+    196: ('schabbs', 4, True, 0),
+    215: ('otto', 4, True, 0),
+    178: ('hitler', 4, True, 0),
 }
 
 
@@ -2117,6 +2130,9 @@ COLLECTABLE_OBJECT_NAMES = [
     'medkit',
     'silver_key',
 ]
+
+OBJECT_LIGHT_MAP = {  # name: (height, amount, color)
+}
 
 ENEMY_NAMES = [
     'dog',

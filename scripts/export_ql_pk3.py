@@ -123,16 +123,16 @@ def build_cuboid_vertices(extreme_a, extreme_b):
             [(xb, yb, za), (xa, yb, za), (xa, ya, za), (xb, ya, za)]]
 
 
-def textify_things(things):  # TODO
+def textify_things(something):  # TODO
     lines = []
 
-    if hasattr(things, 'items'):
+    if hasattr(something, 'items') and callable(something.items):
         lines.append('{')
-        sub_things = []
+        sub_things = ()
 
-        for key, value in things.items():
+        for key, value in something.items():
             if key is None:
-                sub_things.extend(value)
+                sub_things = value
             else:
                 tokens = [str(key)]
                 if not hasattr(value, '__iter__') or isinstance(value, (str, tuple)):
@@ -142,7 +142,7 @@ def textify_things(things):  # TODO
                     if isinstance(token, str):
                         token = '"' + token + '"'
                     elif hasattr(value, '__iter__'):
-                        token = ' '.join(['('] + map(str, value) + [')'])
+                        token = ' '.join(['('] + ['{!s}'.format(sub) for sub in value] + [')'])
                     else:
                         token = str(token)
                     tokens.append(token)
@@ -153,7 +153,7 @@ def textify_things(things):  # TODO
         lines.append('}')
 
     else:
-        lines += (textify_things(thing) for thing in things)
+        lines.extend(textify_things(thing) for thing in something)
 
     return '\n'.join(lines)
 
@@ -327,6 +327,22 @@ class MapExporter(object):  # TODO
             lines.extend(self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets))
 
         face_shader = '{}_static/{}'.format(params.short_name, name)
+        lines.extend(self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets))
+
+        return lines
+
+    def describe_collectable(self, tile_coords):
+        params = self.params
+        cfg = self.cfg
+        entity = self.tilemap[tile_coords][1]
+        name = cfg.ENTITY_OBJECT_MAP[entity]
+        lines = []
+
+        if name in cfg.SOLID_OBJECT_NAMES:
+            face_shaders = ['common/clip'] * 6
+            lines.extend(self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets))
+
+        face_shader = '{}_collectable/{}'.format(params.short_name, name)
         lines.extend(self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets))
 
         return lines
@@ -559,10 +575,18 @@ class MapExporter(object):  # TODO
                         lines += self.describe_door_hint(tile_coords)
 
                 if tile[1]:
-                    object_name = cfg.ENTITY_OBJECT_MAP.get(tile[1])
-                    if object_name in cfg.STATIC_OBJECT_NAMES:
+                    partition = find_partition(tile[1], cfg.ENTITY_PARTITION_MAP, count_sign=-1)
+
+                    if partition == 'enemy':
                         lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
-                        lines += self.describe_sprite(tile_coords)
+                        lines += self.describe_dead_enemy_sprite(tile_coords)
+
+                    elif partition == 'object':
+                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
+                        if cfg.ENTITY_OBJECT_MAP.get(tile[1]) in cfg.STATIC_OBJECT_NAMES:
+                            lines += self.describe_sprite(tile_coords)
+                        elif cfg.ENTITY_OBJECT_MAP.get(tile[1]) in cfg.COLLECTABLE_OBJECT_NAMES:
+                            lines += self.describe_collectable(tile_coords)
 
         lines.append('// floor and ceiling clipping planes')
         lines += self.describe_floor_ceiling_clipping()
@@ -673,19 +697,32 @@ class MapExporter(object):  # TODO
         tile = tilemap.get(tile_coords)
         enemy = cfg.ENEMY_MAP.get(tile[1])
 
-        if not enemy or not (params.enemy_level_min <= enemy[3] <= params.enemy_level_max):
+        if enemy and params.enemy_level_min <= enemy[3] <= params.enemy_level_max and enemy[1] < 4:
+            angle = DIR_TO_YAW[ENEMY_INDEX_TO_DIR[enemy[1]]] if enemy else 0
+            origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
+            return [
+                '{',
+                'classname info_player_deathmatch',
+                'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
+                'angle {:.0f}'.format(angle),
+                '}',
+            ]
+        else:
             return ()
 
-        angle = DIR_TO_YAW[ENEMY_INDEX_TO_DIR[enemy[1]]] if enemy else 0
-        origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
+    def describe_dead_enemy_sprite(self, tile_coords):
+        cfg = self.cfg
+        params = self.params
+        tilemap = self.tilemap
+        tile = tilemap.get(tile_coords)
+        enemy = cfg.ENEMY_MAP.get(tile[1])
 
-        return [
-            '{',
-            'classname info_player_deathmatch',
-            'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
-            'angle {:.0f}'.format(angle),
-            '}',
-        ]
+        if enemy:  # and not (params.enemy_level_min <= enemy[3] <= params.enemy_level_max):
+            name = enemy[0] + '__dead'
+            face_shader = '{}_enemy/{}'.format(params.short_name, name)
+            return self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets)
+        else:
+            return ()
 
     def describe_object(self, tile_coords):
         return ()  # TODO
@@ -866,7 +903,7 @@ def build_argument_parser():
     group.add_argument('--short-name', default='wolf3d')
     group.add_argument('--author', default='(c) id Software')
     group.add_argument('--author2')
-    group.add_argument('--wave-rate', default=44100, type=int)
+    group.add_argument('--wave-rate', default=22050, type=int)
     group.add_argument('--imf-rate', default=700, type=int)
     group.add_argument('--imf2wav-path', default=IMF2WAV_PATH)
     group.add_argument('--tile-units', default=96, type=int)
@@ -880,7 +917,7 @@ def build_argument_parser():
     group.add_argument('--pushwall-wait', default=32767, type=float)
     group.add_argument('--pushwall-speed', default=90, type=float)
     group.add_argument('--pushwall-trigger-wait', default=32767, type=float)
-    group.add_argument('--underworld-offset', default=4096, type=int)
+    group.add_argument('--underworld-offset', default=-4096, type=int)
     group.add_argument('--enemy-level-min', default=0, type=int)
     group.add_argument('--enemy-level-max', default=3, type=int)
 
@@ -961,7 +998,7 @@ def write_collectable_shaders(params, cfg, shader_file):
 
 def write_enemy_shaders(params, cfg, shader_file):
     ignored_names = cfg.STATIC_OBJECT_NAMES + cfg.COLLECTABLE_OBJECT_NAMES
-    names = [name for name in cfg.SPRITE_NAMES if name not in ignored_names]
+    names = [name for name in cfg.SPRITE_NAMES if name not in ignored_names or name.endswith('__dead')]
     for name in names:
         shader_name = 'textures/{}_enemy/{}'.format(params.short_name, name)
         path = 'sprites/{}/{}.tga'.format(params.short_name, name)
@@ -1270,6 +1307,8 @@ def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):  # TODO
         path = 'maps/{}/{}.map'.format(params.short_name, tilemap.name)
         zip_file.writestr(path, description)
 
+        break  # XXX
+
     logger.info('Done')
     _sep()
 
@@ -1333,7 +1372,7 @@ def main(*args):
     with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:
         _sep()
         export_tilemaps(params, cfg, pk3_file, tilemap_chunks_handler)
-        export_shaders(params, cfg, pk3_file)
+#         export_shaders(params, cfg, pk3_file)
 #         export_textures(params, cfg, pk3_file, vswap_chunks_handler)
 #         export_sprites(params, cfg, pk3_file, vswap_chunks_handler)
 #        export_fonts(params, cfg, pk3_file, graphics_chunks_handler)
