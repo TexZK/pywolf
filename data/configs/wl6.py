@@ -2117,6 +2117,7 @@ SOLID_OBJECT_NAMES = [
 
 COLLECTABLE_OBJECT_NAMES = [
     'ammo',
+    'ammo_used'
     'chaingun',
     'chalice',
     'cross',
@@ -2132,25 +2133,551 @@ COLLECTABLE_OBJECT_NAMES = [
 ]
 
 OBJECT_LIGHT_MAP = {  # name: (height, amount, color)
+    'ceiling_light': (0.8, 100, (1.0, 1.0, 0.9)),
+    'chandelier':    (0.8, 200, (1.0, 1.0, 0.8)),
+    'lamp':          (0.6, 100, (1.0, 1.0, 0.9)),
+
+    'chalice': (0.2, 30, (1.0, 1.0, 0.8)),
+    'cross':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'crown':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'jewels':  (0.2, 30, (1.0, 1.0, 0.8)),
+
+    'extra_life': (0.3, 30, (0.8, 0.8, 1.0)),
+    'gold_key':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'medkit':     (0.2, 30, (1.0, 1.0, 1.0)),
+    'silver_key': (0.2, 30, (0.8, 1.0, 1.0)),
 }
 
-ENEMY_NAMES = [
-    'dog',
-    'fettgesicht',
-    'ghost_blinky',
-    'ghost_clyde',
-    'ghost_inky',
-    'ghost_pinky',
-    'gretel',
-    'guard',
-    'hans',
-    'hitler',
-    'mecha_hitler',
-    'mutant',
-    'needle',
-    'officer',
-    'otto',
-    'robed_fake',
-    'schabbs',
-    'ss',
-]
+# TODO: add 'speed'
+ENEMY_DESCRIPTORS = {
+    'dog': {
+        'health': 1,
+        'points': 200,
+        'speed': 1500,
+        'sounds': {
+            'sight':  'DOGBARKSND',
+            'attack': 'DOGATTACKSND',
+            'death':  'DOGDEATHSND',
+        },
+    },
+    'fettgesicht': {
+        'health': [850, 950, 1050, 1200],
+        'points': 5000,
+        'sounds': {
+            'sight':  'ERLAUBENSND',
+            'attack': 'MISSILEFIRESND',
+            'death':  'ROSESND',
+        },
+    },
+    'ghost_blinky': {
+        'health': 25,
+    },
+    'ghost_clyde': {
+        'health': 25,
+    },
+    'ghost_inky': {
+        'health': 25,
+    },
+    'ghost_pinky': {
+        'health': 25,
+    },
+    'gretel': {
+        'health': [850, 950, 1050, 1200],
+        'points': 5000,
+        'drop': 'key_silver',
+        'sounds': {
+            'sight':  'KEINSND',
+            'attack': 'NAZIFIRESND',
+            'death':  'MEINSND',
+        },
+    },
+    'guard': {
+        'health': 25,
+        'points': 100,
+        'drop': 'ammo_used',
+        'sounds': {
+            'sight': 'HALTSND',
+            'attack': 'NAZIFIRESND',
+            'death': [
+                'DEATHSCREAM2SND',
+                'DEATHSCREAM3SND',
+                'DEATHSCREAM4SND',
+                'DEATHSCREAM5SND',
+                'DEATHSCREAM7SND',
+                'DEATHSCREAM8SND',
+                'DEATHSCREAM9SND'
+            ],
+        },
+    },
+    'hans': {
+        'health': [850, 950, 1050, 1200],
+        'points': 5000,
+        'drop': 'silver_key',
+        'sounds': {
+            'sight':  'GUTENTAGSND',
+            'attack': 'BOSSFIRESND',
+            'death':  'MUTTISND',
+        },
+    },
+    'hitler': {
+        'health': [500, 700, 800, 900],
+        'points': 5000,
+        'sounds': {
+            'sight':  'DIESND',
+            'attack': 'BOSSFIRESND',
+            'death':  'EVASND',
+        },
+    },
+    'mecha_hitler': {
+        'health': [800, 950, 1050, 1200],
+        'points': 5000,
+        'sounds': {
+            'sight':  'DIESND',
+            'attack': 'BOSSFIRESND',
+            'death':  'SCHEISTSND',
+        },
+    },
+    'mutant': {
+        'health': [45, 55, 55, 65],
+        'points': 700,
+        'drop': 'ammo_used',
+        'sounds': {
+            'attack': 'NAZIFIRESND',
+            'death':  'AHHHGSND',
+        },
+    },
+    'officer': {
+        'health': 50,
+        'points': 400,
+        'drop': 'ammo_used',
+        'sounds': {
+            'sight':  'SPIONSND',
+            'attack': 'NAZIFIRESND',
+            'death':  'NEINSOVASSND',
+        },
+    },
+    'otto': {
+        'health': [850, 950, 1050, 1200],
+        'points': 5000,
+        'sounds': {
+            'sight':  'EINESND',
+            'attack': 'MISSILEFIRESND',
+            'death':  'DONNERSND',
+        },
+    },
+    'robed_fake': {
+        'health': [200, 300, 400, 500],
+        'points': 2000,
+        'sounds': {
+            'sight':  'TOT_HUNDSND',
+            'attack': 'FLAMETHROWERSND',
+            'death':  'HITLERHASND',
+        },
+    },
+    'schabbs': {
+        'health': [850, 950, 1550, 2400],
+        'points': 5000,
+        'sounds': {
+            'sight':  'SCHABBSHASND',
+            'attack': 'SCHABBSTHROWSND',
+            'death':  'MEINGOTTSND',
+        },
+    },
+    'ss': {
+        'health': 100,
+        'points': 400,
+        'drop': 'machinegun',
+        'sounds': {
+            'sight':  'SCHUTZADSND',
+            'attack': 'SSFIRESND',
+            'death':  'LEBENSND',
+        },
+    },
+}
+
+ENEMY_NAMES = list(sorted(ENEMY_DESCRIPTORS.keys()))
+
+OBJECT_STATES = {  # (rotate, sprite, ticks, think, action, next)
+    'boom': {
+        'die1': (False, 'SPR_BOOM_1', 6, None, None, 'die2'),
+        'die2': (False, 'SPR_BOOM_2', 6, None, None, 'die3'),
+        'die3': (False, 'SPR_BOOM_3', 6, None, None, None),
+    },
+    'dog': {
+        'path1':  (True, 'SPR_DOG_W1_1', 20, 'T_Path', None, 'path1s'),
+        'path1s': (True, 'SPR_DOG_W1_1',  5, None,     None, 'path2'),
+        'path2':  (True, 'SPR_DOG_W2_1', 15, 'T_Path', None, 'path3'),
+        'path3':  (True, 'SPR_DOG_W3_1', 20, 'T_Path', None, 'path3s'),
+        'path3s': (True, 'SPR_DOG_W3_1',  5, None,     None, 'path4'),
+        'path4':  (True, 'SPR_DOG_W4_1', 15, 'T_Path', None, 'path1'),
+
+        'jump1': (False, 'SPR_DOG_JUMP1', 10, None, None,     'jump2'),
+        'jump2': (False, 'SPR_DOG_JUMP2', 10, None, 'T_Bite', 'jump3'),
+        'jump3': (False, 'SPR_DOG_JUMP3', 10, None, None,     'jump4'),
+        'jump4': (False, 'SPR_DOG_JUMP1', 10, None, None,     'jump5'),
+        'jump5': (False, 'SPR_DOG_W1_1',  10, None, None,     'chase1'),
+
+        'chase1':  (True, 'SPR_DOG_W1_1', 10, 'T_DogChase', None, 'chase1s'),
+        'chase1s': (True, 'SPR_DOG_W1_1',  3, None,         None, 'chase2'),
+        'chase2':  (True, 'SPR_DOG_W2_1',  8, 'T_DogChase', None, 'chase3'),
+        'chase3':  (True, 'SPR_DOG_W3_1', 10, 'T_DogChase', None, 'chase3s'),
+        'chase3s': (True, 'SPR_DOG_W3_1',  3, None,         None, 'chase4'),
+        'chase4':  (True, 'SPR_DOG_W4_1',  8, 'T_DogChase', None, 'chase1'),
+
+        'die1': (False, 'SPR_DOG_DIE_1', 15, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_DOG_DIE_2', 15, None, None, 'die3'),
+        'die3': (False, 'SPR_DOG_DIE_3', 15, None, None, 'dead'),
+        'dead': (False, 'SPR_DOG_DEAD',  15, None, None, 'dead'),
+    },
+    'fettgesicht': {
+        'stand': (False, 'SPR_FAT_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_FAT_W1', 10, 'T_Fat', None, 'chase1s'),
+        'chase1s': (False, 'SPR_FAT_W1',  3, None,    None, 'chase2'),
+        'chase2':  (False, 'SPR_FAT_W2',  8, 'T_Fat', None, 'chase3'),
+        'chase3':  (False, 'SPR_FAT_W3', 10, 'T_Fat', None, 'chase3s'),
+        'chase3s': (False, 'SPR_FAT_W3',  3, None,    None, 'chase4'),
+        'chase4':  (False, 'SPR_FAT_W4',  8, 'T_Fat', None, 'chase1'),
+
+        'deathcam': (False, 'SPR_FAT_W1', 1, None, None, 'die1'),
+
+        'die1': (False, 'SPR_FAT_W1',    1, None, 'A_DeathScream',   'die2'),
+        'die2': (False, 'SPR_FAT_W1',   10, None, None,              'die3'),
+        'die3': (False, 'SPR_FAT_DIE1', 10, None, None,              'die4'),
+        'die4': (False, 'SPR_FAT_DIE2', 10, None, None,              'die5'),
+        'die5': (False, 'SPR_FAT_DIE3', 10, None, None,              'die6'),
+        'die6': (False, 'SPR_FAT_DEAD', 20, None, 'A_StartDeathCam', 'die6'),
+
+        'shoot1': (False, 'SPR_FAT_SHOOT1', 30, None, None,          'shoot2'),
+        'shoot2': (False, 'SPR_FAT_SHOOT2', 10, None, 'T_GiftThrow', 'shoot3'),
+        'shoot3': (False, 'SPR_FAT_SHOOT3', 10, None, 'T_Shoot',     'shoot4'),
+        'shoot4': (False, 'SPR_FAT_SHOOT4', 10, None, 'T_Shoot',     'shoot5'),
+        'shoot5': (False, 'SPR_FAT_SHOOT3', 10, None, 'T_Shoot',     'shoot6'),
+        'shoot6': (False, 'SPR_FAT_SHOOT4', 10, None, 'T_Shoot',     'chase1'),
+    },
+    'ghost_blinky': {
+        'chase1':  (False, 'SPR_BLINKY_W1', 10, 'T_Ghosts', None, 'chase2'),
+        'chase2':  (False, 'SPR_BLINKY_W2', 10, 'T_Ghosts', None, 'chase1'),
+    },
+    'ghost_clyde': {
+        'chase1':  (False, 'SPR_CLYDE_W1', 10, 'T_Ghosts', None, 'chase2'),
+        'chase2':  (False, 'SPR_CLYDE_W2', 10, 'T_Ghosts', None, 'chase1'),
+    },
+    'ghost_inky': {
+        'chase1':  (False, 'SPR_INKY_W1', 10, 'T_Ghosts', None, 'chase2'),
+        'chase2':  (False, 'SPR_INKY_W2', 10, 'T_Ghosts', None, 'chase1'),
+    },
+    'ghost_pinky': {
+        'chase1':  (False, 'SPR_PINKY_W1', 10, 'T_Ghosts', None, 'chase2'),
+        'chase2':  (False, 'SPR_PINKY_W2', 10, 'T_Ghosts', None, 'chase1'),
+    },
+    'gretel': {
+        'stand': (False, 'SPR_GRETEL_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_GRETEL_W1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (False, 'SPR_GRETEL_W1',  3, None,      None, 'chase2'),
+        'chase2':  (False, 'SPR_GRETEL_W2',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (False, 'SPR_GRETEL_W3', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (False, 'SPR_GRETEL_W3',  3, None,      None, 'chase4'),
+        'chase4':  (False, 'SPR_GRETEL_W4',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_GRETEL_DIE1', 15, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_GRETEL_DIE2', 15, None, None,            'die3'),
+        'die3': (False, 'SPR_GRETEL_DIE3', 15, None, None,            'die4'),
+        'die4': (False, 'SPR_GRETEL_DEAD',  0, None, None,            'die4'),
+
+        'shoot1': (False, 'SPR_GRETEL_SHOOT1', 30, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_GRETEL_SHOOT2', 10, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_GRETEL_SHOOT3', 10, None, 'T_Shoot', 'shoot4'),
+        'shoot4': (False, 'SPR_GRETEL_SHOOT2', 10, None, 'T_Shoot', 'shoot5'),
+        'shoot5': (False, 'SPR_GRETEL_SHOOT3', 10, None, 'T_Shoot', 'shoot6'),
+        'shoot6': (False, 'SPR_GRETEL_SHOOT2', 10, None, 'T_Shoot', 'shoot7'),
+        'shoot7': (False, 'SPR_GRETEL_SHOOT3', 10, None, 'T_Shoot', 'shoot8'),
+        'shoot8': (False, 'SPR_GRETEL_SHOOT1', 10, None, None,      'chase1'),
+    },
+    'guard': {
+        'stand': (True, 'SPR_GRD_S_1', 0, 'T_Stand', None, 'stand'),
+
+        'path1':  (True, 'SPR_GRD_W1_1', 20, 'T_Path', None, 'path1s'),
+        'path1s': (True, 'SPR_GRD_W1_1',  5, None,     None, 'path2'),
+        'path2':  (True, 'SPR_GRD_W2_1', 15, 'T_Path', None, 'path3'),
+        'path3':  (True, 'SPR_GRD_W3_1', 20, 'T_Path', None, 'path3s'),
+        'path3s': (True, 'SPR_GRD_W3_1',  5, None,     None, 'path4'),
+        'path4':  (True, 'SPR_GRD_W4_1', 15, 'T_Path', None, 'path1'),
+
+        'pain':  (False, 'SPR_GRD_PAIN_1', 10, None, None, 'chase1'),
+        'pain1': (False, 'SPR_GRD_PAIN_2', 10, None, None, 'chase1'),
+
+        'shoot1': (False, 'SPR_GRD_SHOOT1', 20, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_GRD_SHOOT2', 20, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_GRD_SHOOT3', 20, None, None,      'chase1'),
+
+        'chase1':  (True, 'SPR_GRD_W1_1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (True, 'SPR_GRD_W1_1',  3, None,      None, 'chase2'),
+        'chase2':  (True, 'SPR_GRD_W2_1',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (True, 'SPR_GRD_W3_1', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (True, 'SPR_GRD_W3_1',  3, None,      None, 'chase4'),
+        'chase4':  (True, 'SPR_GRD_W4_1',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_GRD_DIE_1', 15, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_GRD_DIE_2', 15, None, None,            'die3'),
+        'die3': (False, 'SPR_GRD_DIE_3', 15, None, None,            'die4'),
+        'die4': (False, 'SPR_GRD_DEAD',   0, None, None,            'die4'),
+    },
+    'hans': {
+        'stand': (False, 'SPR_BOSS_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_BOSS_W1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (False, 'SPR_BOSS_W1',  3, None,      None, 'chase2'),
+        'chase2':  (False, 'SPR_BOSS_W2',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (False, 'SPR_BOSS_W3', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (False, 'SPR_BOSS_W3',  3, None,      None, 'chase4'),
+        'chase4':  (False, 'SPR_BOSS_W4',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_BOSS_DIE1', 15, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_BOSS_DIE2', 15, None, None,            'die3'),
+        'die3': (False, 'SPR_BOSS_DIE3', 15, None, None,            'die4'),
+        'die4': (False, 'SPR_BOSS_DEAD',  0, None, None,            'die4'),
+
+        'shoot1': (False, 'SPR_BOSS_SHOOT1', 30, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_BOSS_SHOOT2', 10, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_BOSS_SHOOT3', 10, None, 'T_Shoot', 'shoot4'),
+        'shoot4': (False, 'SPR_BOSS_SHOOT2', 10, None, 'T_Shoot', 'shoot5'),
+        'shoot5': (False, 'SPR_BOSS_SHOOT3', 10, None, 'T_Shoot', 'shoot6'),
+        'shoot6': (False, 'SPR_BOSS_SHOOT2', 10, None, 'T_Shoot', 'shoot7'),
+        'shoot7': (False, 'SPR_BOSS_SHOOT3', 10, None, 'T_Shoot', 'shoot8'),
+        'shoot8': (False, 'SPR_BOSS_SHOOT1', 10, None, None,      'chase1'),
+    },
+    'hitler': {
+        'chase1':  (False, 'SPR_HITLER_W1', 6, 'T_Chase', None, 'chase1s'),
+        'chase1s': (False, 'SPR_HITLER_W1', 4, None,      None, 'chase2'),
+        'chase2':  (False, 'SPR_HITLER_W2', 2, 'T_Chase', None, 'chase3'),
+        'chase3':  (False, 'SPR_HITLER_W3', 6, 'T_Chase', None, 'chase3s'),
+        'chase3s': (False, 'SPR_HITLER_W3', 4, None,      None, 'chase4'),
+        'chase4':  (False, 'SPR_HITLER_W4', 2, 'T_Chase', None, 'chase1'),
+
+        'deathcam': (False, 'SPR_HITLER_W1', 10, None, None, 'die1'),
+
+        'die1':  (False, 'SPR_HITLER_W1',    1, None, 'A_DeathScream',   'die2'),
+        'die2':  (False, 'SPR_HITLER_W1',   10, None, None,              'die3'),
+        'die3':  (False, 'SPR_HITLER_DIE1', 10, None, 'A_Slurpie',       'die4'),
+        'die4':  (False, 'SPR_HITLER_DIE2', 10, None, None,              'die5'),
+        'die5':  (False, 'SPR_HITLER_DIE3', 10, None, None,              'die6'),
+        'die6':  (False, 'SPR_HITLER_DIE4', 10, None, None,              'die7'),
+        'die7':  (False, 'SPR_HITLER_DIE5', 10, None, None,              'die8'),
+        'die8':  (False, 'SPR_HITLER_DIE6', 10, None, None,              'die9'),
+        'die9':  (False, 'SPR_HITLER_DIE7', 10, None, None,              'die10'),
+        'die10': (False, 'SPR_HITLER_DEAD', 20, None, 'A_StartDeathCam', 'die10'),
+
+        'shoot1': (False, 'SPR_HITLER_SHOOT1', 30, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_HITLER_SHOOT2', 10, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_HITLER_SHOOT3', 10, None, 'T_Shoot', 'shoot4'),
+        'shoot4': (False, 'SPR_HITLER_SHOOT2', 10, None, 'T_Shoot', 'shoot5'),
+        'shoot5': (False, 'SPR_HITLER_SHOOT3', 10, None, 'T_Shoot', 'shoot6'),
+        'shoot6': (False, 'SPR_HITLER_SHOOT2', 10, None, 'T_Shoot', 'chase1'),
+    },
+    'mecha_hitler': {
+        'stand': (False, 'SPR_MECHA_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_MECHA_W1', 10, 'T_Chase', 'A_MechaSound', 'chase1s'),
+        'chase1s': (False, 'SPR_MECHA_W1',  6, None,      None,           'chase2'),
+        'chase2':  (False, 'SPR_MECHA_W2',  8, 'T_Chase', None,           'chase3'),
+        'chase3':  (False, 'SPR_MECHA_W3', 10, 'T_Chase', 'A_MechaSound', 'chase3s'),
+        'chase3s': (False, 'SPR_MECHA_W3',  6, None,      None,           'chase4'),
+        'chase4':  (False, 'SPR_MECHA_W4',  8, 'T_Chase', None,           'chase1'),
+
+        'die1': (False, 'SPR_MECHA_DIE1', 10, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_MECHA_DIE2', 10, None, None,            'die3'),
+        'die3': (False, 'SPR_MECHA_DIE3', 10, None, 'A_HitlerMorph', 'die4'),
+        'die4': (False, 'SPR_MECHA_DEAD',  0, None, None,            'die4'),
+
+        'shoot1': (False, 'SPR_MECHA_SHOOT1', 30, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_MECHA_SHOOT2', 10, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_MECHA_SHOOT3', 10, None, 'T_Shoot', 'shoot4'),
+        'shoot4': (False, 'SPR_MECHA_SHOOT2', 10, None, 'T_Shoot', 'shoot5'),
+        'shoot5': (False, 'SPR_MECHA_SHOOT3', 10, None, 'T_Shoot', 'shoot6'),
+        'shoot6': (False, 'SPR_MECHA_SHOOT2', 10, None, 'T_Shoot', 'chase1'),
+    },
+    'mutant': {
+        'stand': (True, 'SPR_MUT_S_1', 0, 'T_Stand', None, 'stand'),
+
+        'path1':  (True, 'SPR_MUT_W1_1', 20, 'T_Path', None, 'path1s'),
+        'path1s': (True, 'SPR_MUT_W1_1',  5, None,     None, 'path2'),
+        'path2':  (True, 'SPR_MUT_W2_1', 15, 'T_Path', None, 'path3'),
+        'path3':  (True, 'SPR_MUT_W3_1', 20, 'T_Path', None, 'path3s'),
+        'path3s': (True, 'SPR_MUT_W3_1',  5, None,     None, 'path4'),
+        'path4':  (True, 'SPR_MUT_W4_1', 15, 'T_Path', None, 'path1'),
+
+        'pain':  (False, 'SPR_MUT_PAIN_1', 10, None, None, 'chase1'),
+        'pain1': (False, 'SPR_MUT_PAIN_2', 10, None, None, 'chase1'),
+
+        'shoot1': (False, 'SPR_MUT_SHOOT1',  6, None, 'T_Shoot', 'shoot2'),
+        'shoot2': (False, 'SPR_MUT_SHOOT2', 20, None, None,      'shoot3'),
+        'shoot3': (False, 'SPR_MUT_SHOOT3', 10, None, 'T_Shoot', 'shoot4'),
+        'shoot4': (False, 'SPR_MUT_SHOOT4', 20, None, None,      'chase1'),
+
+        'chase1':  (True, 'SPR_MUT_W1_1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (True, 'SPR_MUT_W1_1',  3, None,      None, 'chase2'),
+        'chase2':  (True, 'SPR_MUT_W2_1',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (True, 'SPR_MUT_W3_1', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (True, 'SPR_MUT_W3_1',  3, None,      None, 'chase4'),
+        'chase4':  (True, 'SPR_MUT_W4_1',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_MUT_DIE_1', 7, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_MUT_DIE_2', 7, None, None,            'die3'),
+        'die3': (False, 'SPR_MUT_DIE_3', 7, None, None,            'die4'),
+        'die4': (False, 'SPR_MUT_DIE_4', 7, None, None,            'die5'),
+        'die5': (False, 'SPR_MUT_DEAD',  0, None, None,            'die5'),
+    },
+    'needle': {
+        'fly1': (False, 'SPR_HYPO1', 6, 'T_Projectile', None, 'fly2'),
+        'fly2': (False, 'SPR_HYPO2', 6, 'T_Projectile', None, 'fly3'),
+        'fly3': (False, 'SPR_HYPO3', 6, 'T_Projectile', None, 'fly4'),
+        'fly4': (False, 'SPR_HYPO4', 6, 'T_Projectile', None, 'fly1'),
+    },
+    'officer': {
+        'stand': (True, 'SPR_OFC_S_1', 0, 'T_Stand', None, 'stand'),
+
+        'path1':  (True, 'SPR_OFC_W1_1', 20, 'T_Path', None, 'path1s'),
+        'path1s': (True, 'SPR_OFC_W1_1',  5, None,     None, 'path2'),
+        'path2':  (True, 'SPR_OFC_W2_1', 15, 'T_Path', None, 'path3'),
+        'path3':  (True, 'SPR_OFC_W3_1', 20, 'T_Path', None, 'path3s'),
+        'path3s': (True, 'SPR_OFC_W3_1',  5, None,     None, 'path4'),
+        'path4':  (True, 'SPR_OFC_W4_1', 15, 'T_Path', None, 'path1'),
+
+        'pain':  (False, 'SPR_OFC_PAIN_1', 10, None, None, 'chase1'),
+        'pain1': (False, 'SPR_OFC_PAIN_2', 10, None, None, 'chase1'),
+
+        'shoot1': (False, 'SPR_OFC_SHOOT1',  6, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_OFC_SHOOT2', 20, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_OFC_SHOOT3', 10, None, None,      'chase1'),
+
+        'chase1':  (True, 'SPR_OFC_W1_1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (True, 'SPR_OFC_W1_1',  3, None,      None, 'chase2'),
+        'chase2':  (True, 'SPR_OFC_W2_1',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (True, 'SPR_OFC_W3_1', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (True, 'SPR_OFC_W3_1',  3, None,      None, 'chase4'),
+        'chase4':  (True, 'SPR_OFC_W4_1',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_OFC_DIE_1', 11, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_OFC_DIE_2', 11, None, None,            'die3'),
+        'die3': (False, 'SPR_OFC_DIE_3', 11, None, None,            'die4'),
+        'die4': (False, 'SPR_OFC_DIE_4', 11, None, None,            'die5'),
+        'die5': (False, 'SPR_OFC_DEAD',   0, None, None,            'die5'),
+    },
+    'otto': {
+        'stand': (False, 'SPR_GIFT_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_GIFT_W1', 10, 'T_Gift', None, 'chase1s'),
+        'chase1s': (False, 'SPR_GIFT_W1',  3, None,     None, 'chase2'),
+        'chase2':  (False, 'SPR_GIFT_W2',  8, 'T_Gift', None, 'chase3'),
+        'chase3':  (False, 'SPR_GIFT_W3', 10, 'T_Gift', None, 'chase3s'),
+        'chase3s': (False, 'SPR_GIFT_W3',  3, None,     None, 'chase4'),
+        'chase4':  (False, 'SPR_GIFT_W4',  8, 'T_Gift', None, 'chase1'),
+
+        'deathcam': (False, 'SPR_GIFT_W1', 1, None, None, 'die1'),
+
+        'die1': (False, 'SPR_GIFT_W1',    1, None, 'A_DeathScream',   'die2'),
+        'die2': (False, 'SPR_GIFT_W1',   10, None, None,              'die3'),
+        'die3': (False, 'SPR_GIFT_DIE1', 10, None, None,              'die4'),
+        'die4': (False, 'SPR_GIFT_DIE2', 10, None, None,              'die5'),
+        'die5': (False, 'SPR_GIFT_DIE3', 10, None, None,              'die6'),
+        'die6': (False, 'SPR_GIFT_DEAD', 20, None, 'A_StartDeathCam', 'die6'),
+
+        'shoot1': (False, 'SPR_GIFT_SHOOT1', 30, None, None,          'shoot2'),
+        'shoot2': (False, 'SPR_GIFT_SHOOT2', 10, None, 'T_GiftThrow', 'chase1'),
+    },
+    'robed_fake': {
+        'stand': (False, 'SPR_FAKE_W1', 0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_FAKE_W1', 10, 'T_Fake', None, 'chase1s'),
+        'chase1s': (False, 'SPR_FAKE_W1',  3, None,     None, 'chase2'),
+        'chase2':  (False, 'SPR_FAKE_W2',  8, 'T_Fake', None, 'chase3'),
+        'chase3':  (False, 'SPR_FAKE_W3', 10, 'T_Fake', None, 'chase3s'),
+        'chase3s': (False, 'SPR_FAKE_W3',  3, None,     None, 'chase4'),
+        'chase4':  (False, 'SPR_FAKE_W4',  8, 'T_Fake', None, 'chase1'),
+
+        'die1': (False, 'SPR_FAKE_DIE1', 10, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_FAKE_DIE2', 10, None, None,            'die3'),
+        'die3': (False, 'SPR_FAKE_DIE3', 10, None, None,            'die4'),
+        'die4': (False, 'SPR_FAKE_DIE4', 10, None, None,            'die5'),
+        'die5': (False, 'SPR_FAKE_DIE5', 10, None, None,            'die6'),
+        'die6': (False, 'SPR_FAKE_DEAD',  0, None, None,            'die6'),
+
+        'shoot1': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot2'),
+        'shoot2': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot3'),
+        'shoot3': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot4'),
+        'shoot4': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot5'),
+        'shoot5': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot6'),
+        'shoot6': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot7'),
+        'shoot7': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot8'),
+        'shoot8': (False, 'SPR_FAKE_SHOOT', 8, None, 'T_FakeFire', 'shoot9'),
+        'shoot9': (False, 'SPR_FAKE_SHOOT', 8, None, None,         'chase1'),
+    },
+    'rocket': {
+        'fly': (True, 'SPR_ROCKET_1', 3, 'T_Projectile', 'A_Smoke', 'fly'),
+    },
+    'schabbs': {
+        'stand': (False, 'SPR_SCHABB_W1',0, 'T_Stand', None, 'stand'),
+
+        'chase1':  (False, 'SPR_SCHABB_W1', 10, 'T_Schabb', None, 'chase1s'),
+        'chase1s': (False, 'SPR_SCHABB_W1',  3, None,       None, 'chase2'),
+        'chase2':  (False, 'SPR_SCHABB_W2',  8, 'T_Schabb', None, 'chase3'),
+        'chase3':  (False, 'SPR_SCHABB_W3', 10, 'T_Schabb', None, 'chase3s'),
+        'chase3s': (False, 'SPR_SCHABB_W3',  3, None,       None, 'chase4'),
+        'chase4':  (False, 'SPR_SCHABB_W4',  8, 'T_Schabb', None, 'chase1'),
+
+        'deathcam': (False, 'SPR_SCHABB_W1', 1, None, 'die1'),
+
+        'die1': (False, 'SPR_SCHABB_W1',   10, None, 'A_DeathScream',   'die2'),
+        'die2': (False, 'SPR_SCHABB_W1',   10, None, None,              'die3'),
+        'die3': (False, 'SPR_SCHABB_DIE1', 10, None, None,              'die4'),
+        'die4': (False, 'SPR_SCHABB_DIE2', 10, None, None,              'die5'),
+        'die5': (False, 'SPR_SCHABB_DIE3', 10, None, None,              'die6'),
+        'die6': (False, 'SPR_SCHABB_DEAD', 20, None, 'A_StartDeathCam', 'die6'),
+
+        'shoot1': (False, 'SPR_SCHABB_SHOOT1',30, None, 'shoot2'),
+        'shoot2': (False, 'SPR_SCHABB_SHOOT2',10, None,'T_SchabbThrow', 'chase1'),
+    },
+    'smoke': {
+        'die1': (False, 'SPR_SMOKE_1', 3, None, None, 'die2'),
+        'die2': (False, 'SPR_SMOKE_2', 3, None, None, 'die3'),
+        'die3': (False, 'SPR_SMOKE_3', 3, None, None, 'die4'),
+        'die4': (False, 'SPR_SMOKE_4', 3, None, None, None),
+    },
+    'ss': {
+        'stand': (True, 'SPR_SS_S_1', 0, 'T_Stand', None, 'stand'),
+
+        'path1':  (True, 'SPR_SS_W1_1', 20, 'T_Path', None, 'path1s'),
+        'path1s': (True, 'SPR_SS_W1_1',  5, None,     None, 'path2'),
+        'path2':  (True, 'SPR_SS_W2_1', 15, 'T_Path', None, 'path3'),
+        'path3':  (True, 'SPR_SS_W3_1', 20, 'T_Path', None, 'path3s'),
+        'path3s': (True, 'SPR_SS_W3_1',  5, None,     None, 'path4'),
+        'path4':  (True, 'SPR_SS_W4_1', 15, 'T_Path', None, 'path1'),
+
+        'pain':  (False, 'SPR_SS_PAIN_1', 10, None, None, 'chase1'),
+        'pain1': (False, 'SPR_SS_PAIN_2', 10, None, None, 'chase1'),
+
+        'shoot1': (False, 'SPR_SS_SHOOT1', 20, None, None,      'shoot2'),
+        'shoot2': (False, 'SPR_SS_SHOOT2', 20, None, 'T_Shoot', 'shoot3'),
+        'shoot3': (False, 'SPR_SS_SHOOT3', 10, None, None,      'shoot4'),
+        'shoot4': (False, 'SPR_SS_SHOOT2', 10, None, 'T_Shoot', 'shoot5'),
+        'shoot5': (False, 'SPR_SS_SHOOT3', 10, None, None,      'shoot6'),
+        'shoot6': (False, 'SPR_SS_SHOOT2', 10, None, 'T_Shoot', 'shoot7'),
+        'shoot7': (False, 'SPR_SS_SHOOT3', 10, None, None,      'shoot8'),
+        'shoot8': (False, 'SPR_SS_SHOOT2', 10, None, 'T_Shoot', 'shoot9'),
+        'shoot9': (False, 'SPR_SS_SHOOT3', 10, None, None,      'chase1'),
+
+        'chase1':  (True, 'SPR_SS_W1_1', 10, 'T_Chase', None, 'chase1s'),
+        'chase1s': (True, 'SPR_SS_W1_1',  3, None,      None, 'chase2'),
+        'chase2':  (True, 'SPR_SS_W2_1',  8, 'T_Chase', None, 'chase3'),
+        'chase3':  (True, 'SPR_SS_W3_1', 10, 'T_Chase', None, 'chase3s'),
+        'chase3s': (True, 'SPR_SS_W3_1',  3, None,      None, 'chase4'),
+        'chase4':  (True, 'SPR_SS_W4_1',  8, 'T_Chase', None, 'chase1'),
+
+        'die1': (False, 'SPR_SS_DIE_1', 15, None, 'A_DeathScream', 'die2'),
+        'die2': (False, 'SPR_SS_DIE_2', 15, None, None,            'die3'),
+        'die3': (False, 'SPR_SS_DIE_3', 15, None, None,            'die4'),
+        'die4': (False, 'SPR_SS_DEAD',   0, None, None,            'die4'),
+    },
+}
