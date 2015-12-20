@@ -101,8 +101,8 @@ class TileMap(object):
 
 class TileMapManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
 
     def _build_resource(self, index, chunk):
         header, raw_planes = chunk

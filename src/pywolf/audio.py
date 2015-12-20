@@ -9,9 +9,12 @@ import subprocess
 import tempfile
 import wave
 
+import soundfile
+
 from .utils import (stream_read, stream_write,
                     stream_pack, stream_unpack, stream_unpack_array,
                     BinaryResource, ResourceManager)
+
 
 ADLIB_CARRIERS = (3, 4, 5, 11, 12, 13, 19, 20, 21)
 ADLIB_MODULATORS = (0, 1, 2, 8, 9, 10, 16, 17, 18)
@@ -160,23 +163,20 @@ def convert_imf_to_wave(imf_chunk, imf2wav_path, wave_path=None, wave_rate=44100
         if chunk_is_temporary:
             with tempfile.NamedTemporaryFile('wb', delete=False) as chunk_file:
                 chunk_file.write(imf_chunk)
-            chunk_path = os.path.join(tempdir_path, chunk_file.name)
+                chunk_path = os.path.join(tempdir_path, chunk_file.name)
         else:
             with open(chunk_path, 'wb') as chunk_file:
                 chunk_file.write(imf_chunk)
 
         if wave_is_temporary:
             with tempfile.NamedTemporaryFile('wb', delete=False) as wave_file:
-                pass
-            wave_path = os.path.join(tempdir_path, wave_file.name)
+                wave_path = os.path.join(tempdir_path, wave_file.name)
         else:
             wave_path = os.path.abspath(wave_path)
 
         imf2wav_path = os.path.abspath(imf2wav_path)
         args = [imf2wav_path, chunk_path, wave_path, str(imf_rate), str(wave_rate)]
         subprocess.Popen(args, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE).communicate()
-
-        return wave_path
 
     except:
         if wave_is_temporary:
@@ -192,6 +192,35 @@ def convert_imf_to_wave(imf_chunk, imf2wav_path, wave_path=None, wave_rate=44100
                 os.unlink(chunk_path)
             except:
                 pass
+
+    return wave_path
+
+
+def convert_wave_to_ogg(wave_path, oggenc2_path, ogg_path=None):
+    ogg_is_temporary = ogg_path is None
+    tempdir_path = tempfile.gettempdir()
+    PIPE = subprocess.PIPE
+
+    try:
+        if ogg_is_temporary:
+            with tempfile.NamedTemporaryFile('wb', delete=False) as ogg_file:
+                ogg_path = os.path.join(tempdir_path, ogg_file.name)
+        else:
+            ogg_path = os.path.abspath(ogg_path)
+
+        oggenc2_path = os.path.abspath(oggenc2_path)
+        args = [oggenc2_path, wave_path, '-o', ogg_path]
+        subprocess.Popen(args, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE).communicate()
+
+    except:
+        if ogg_is_temporary:
+            try:
+                os.unlink(ogg_path)
+            except:
+                pass
+        raise
+
+    return ogg_path
 
 
 class BuzzerSound(object):
@@ -218,8 +247,8 @@ class BuzzerSound(object):
 
 class BuzzerSoundManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
 
     def _build_resource(self, index, chunk):
         return BuzzerSound(chunk)
@@ -388,9 +417,8 @@ class AdLibSound(BinaryResource):
 
 class AdLibSoundManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None,
-                 old_muse_compatibility=False):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, start=None, count=None, old_muse_compatibility=False):
+        super().__init__(chunks_handler, start, count)
         self.old_muse_compatibility = old_muse_compatibility
 
     def _build_resource(self, index, chunk):
@@ -439,8 +467,8 @@ class Music(BinaryResource):
 
 class MusicManager(ResourceManager):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
 
     def _build_resource(self, index, chunk):
         return Music.from_bytes(chunk)
@@ -460,8 +488,8 @@ class SampledSound(object):
 
 class SampledSoundManager(ResourceManager):
 
-    def __init__(self, chunks_handler, rate, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, rate, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
         self.rate = rate
 
     def _build_resource(self, index, chunk):

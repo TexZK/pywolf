@@ -145,8 +145,8 @@ class Picture(object):
 
 class PictureManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette_map, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, palette_map, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
         self._palette_map = palette_map
 
     def _build_resource(self, index, chunk):
@@ -162,21 +162,13 @@ class PictureManager(ResourceManager):
 
 class Tile8Manager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette_map, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, palette_map, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
         self._palette_map = palette_map
 
     def _get(self, index):
-        chunks_handler = self._chunks_handler
-        start = self._start
-        cache = self._cache
-
-        try:
-            item = cache[index]
-        except KeyError:
-            chunk = chunks_handler[start]
-            item = self._build_resource(index, chunk)
-            cache[index] = item
+        chunk = self._chunks_handler[self._start]
+        item = self._build_resource(index, chunk)
         return item
 
     def _build_resource(self, index, chunk):
@@ -203,8 +195,8 @@ class Texture(object):
 
 class TextureManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None, cache=None):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None):
+        super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._dimensions = dimensions
 
@@ -344,8 +336,8 @@ class Font(object):
 
 class FontManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, start=None, count=None, cache=None, alpha_index=0xFF):
-        super().__init__(chunks_handler, start, count, cache)
+    def __init__(self, chunks_handler, palette, start=None, count=None, alpha_index=0xFF):
+        super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._alpha_index = alpha_index
 

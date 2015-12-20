@@ -1,7 +1,6 @@
 # TODO: create Exporter class(es)
 # TODO: break export loops into single item calls with wrapping loop
 # TODO: allow export to normal file, PK3 being an option (like with open(file_object|path))
-# TODO: when exporting stuff, populate with dict() and then generate lines with the resulting dict() tree
 '''
 @author: Andrea Zoppi
 '''
@@ -16,15 +15,15 @@ import zipfile
 
 from PIL import Image
 
-from export_rtcw_pk3 import write_static_shaders
-from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave
+from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave, convert_wave_to_ogg
 import pywolf.game
 from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
 from pywolf.utils import find_partition, load_as_module
 
 
-IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav.exe')
+IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav')
+OGGENC2_PATH = os.path.join('..', 'tools', 'oggenc2')
 
 
 TEXTURE_SHADER_TEMPLATE = '''
@@ -112,6 +111,14 @@ TURN_TO_DISPL = [
 ]
 
 
+def _force_unlink(*paths):
+    for path in paths:
+        try:
+            os.unlink(path)
+        except:
+            pass
+
+
 def build_cuboid_vertices(extreme_a, extreme_b):
     xa, ya, za = extreme_a
     xb, yb, zb = extreme_b
@@ -121,41 +128,6 @@ def build_cuboid_vertices(extreme_a, extreme_b):
             [(xa, yb, zb), (xa, ya, zb), (xa, ya, za), (xa, yb, za)],
             [(xa, yb, zb), (xb, yb, zb), (xb, ya, zb), (xa, ya, zb)],
             [(xb, yb, za), (xa, yb, za), (xa, ya, za), (xb, ya, za)]]
-
-
-def textify_things(something):  # TODO
-    lines = []
-
-    if hasattr(something, 'items') and callable(something.items):
-        lines.append('{')
-        sub_things = ()
-
-        for key, value in something.items():
-            if key is None:
-                sub_things = value
-            else:
-                tokens = [str(key)]
-                if not hasattr(value, '__iter__') or isinstance(value, (str, tuple)):
-                    value = [value]
-
-                for token in value:
-                    if isinstance(token, str):
-                        token = '"' + token + '"'
-                    elif hasattr(value, '__iter__'):
-                        token = ' '.join(['('] + ['{!s}'.format(sub) for sub in value] + [')'])
-                    else:
-                        token = str(token)
-                    tokens.append(token)
-
-                lines.append(' '.join(tokens))
-
-        lines += textify_things(sub_things)
-        lines.append('}')
-
-    else:
-        lines.extend(textify_things(thing) for thing in something)
-
-    return '\n'.join(lines)
 
 
 def describe_cuboid_brush(face_vertices, face_shaders, shader_scales, format_line=None,
@@ -198,6 +170,9 @@ class MapExporter(object):  # TODO
         dimensions = tilemap.dimensions
         half_units = params.tile_units / 2
         self.unit_offsets = ((-half_units * dimensions[0]), (half_units * dimensions[1]), 0)
+
+        self.tile_partition_cache = {}
+        self.entity_partition_cache = {}
 
     def tile_to_unit_coords(self, tile_coords):
         tile_units = self.params.tile_units
@@ -284,7 +259,7 @@ class MapExporter(object):  # TODO
         face_shaders = []
 
         for direction, displacement in enumerate(DIR_TO_DISPL[:4]):
-            facing_coords = [(x + displacement[0]), (y + displacement[1])]
+            facing_coords = ((x + displacement[0]), (y + displacement[1]))
             facing = tilemap.get(facing_coords)
             if facing is None:
                 shader = 'common/caulk'
@@ -292,7 +267,8 @@ class MapExporter(object):  # TODO
                 if facing[1] == pushwall_entity:
                     facing_partition = 'floor'
                 else:
-                    facing_partition = find_partition(facing[0], partition_map, count_sign=1)
+                    facing_partition = find_partition(facing[0], partition_map, count_sign=1,
+                                                      cache=self.tile_partition_cache)
 
                 if facing_partition == 'wall':
                     shader = 'common/caulk'
@@ -303,9 +279,7 @@ class MapExporter(object):  # TODO
                         texture = partition_map['door_hinge'][0] - partition_map['wall'][0]
                     else:
                         raise ValueError((tile_coords, facing_partition))
-
-                    shader = '{}_wall/{}__{}'.format(params.short_name, cfg.TEXTURE_NAMES[texture],
-                                                     (direction & 1))
+                    shader = '{}_wall/{}__{}'.format(params.short_name, cfg.TEXTURE_NAMES[texture], (direction & 1))
             face_shaders.append(shader)
 
         face_shaders += ['common/caulk'] * 2
@@ -539,7 +513,7 @@ class MapExporter(object):  # TODO
         dimensions = self.tilemap.dimensions
         tilemap = self.tilemap
         pushwall_entity = cfg.ENTITY_PARTITION_MAP['pushwall'][0]
-        music_name = cfg.MUSIC_NAMES[cfg.TILEMAP_MUSIC_INDICES[self.tilemap_index]].replace(' ', '_')
+        music_name = cfg.MUSIC_LABELS[cfg.TILEMAP_MUSIC_INDICES[self.tilemap_index]]
 
         lines = [
             '{',
@@ -556,36 +530,38 @@ class MapExporter(object):  # TODO
         for tile_y in range(dimensions[1]):
             for tile_x in range(dimensions[0]):
                 tile_coords = (tile_x, tile_y)
-                tile = tilemap[tile_coords]
+                tile, entity, *_ = tilemap[tile_coords]
 
-                if tile[0]:
-                    partition = find_partition(tile[0], cfg.TILE_PARTITION_MAP, count_sign=1)
-                    lines.append('// {} @ {!r} = tile 0x{:04X}'.format(partition, tile_coords, tile[0]))
+                if tile:
+                    partition = find_partition(tile, cfg.TILE_PARTITION_MAP, count_sign=1,
+                                               cache=self.tile_partition_cache)
+                    lines.append('// {} @ {!r} = tile 0x{:04X}'.format(partition, tile_coords, tile))
 
                     if (partition in ('floor', 'door', 'door_silver', 'door_gold', 'door_elevator') or
-                        tile[1] == pushwall_entity):
+                        entity == pushwall_entity):
                         lines.extend(self.describe_area_brushes(tile_coords))
                     elif partition == 'wall':
                         lines.extend(self.describe_wall_brush(tile_coords))
                     else:
                         raise ValueError((tile_coords, partition))
 
-                    if tile[0] in cfg.DOOR_MAP:
-                        lines.append('// {} @ {!r} = door 0x{:04X}, hint'.format(partition, tile_coords, tile[0]))
+                    if tile in cfg.DOOR_MAP:
+                        lines.append('// {} @ {!r} = door 0x{:04X}, hint'.format(partition, tile_coords, tile))
                         lines += self.describe_door_hint(tile_coords)
 
-                if tile[1]:
-                    partition = find_partition(tile[1], cfg.ENTITY_PARTITION_MAP, count_sign=-1)
+                if entity:
+                    partition = find_partition(entity, cfg.ENTITY_PARTITION_MAP, count_sign=-1,
+                                               cache=self.entity_partition_cache)
 
                     if partition == 'enemy':
-                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
+                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity))
                         lines += self.describe_dead_enemy_sprite(tile_coords)
 
                     elif partition == 'object':
-                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1]))
-                        if cfg.ENTITY_OBJECT_MAP.get(tile[1]) in cfg.STATIC_OBJECT_NAMES:
+                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity))
+                        if cfg.ENTITY_OBJECT_MAP.get(entity) in cfg.STATIC_OBJECT_NAMES:
                             lines += self.describe_sprite(tile_coords)
-                        elif cfg.ENTITY_OBJECT_MAP.get(tile[1]) in cfg.COLLECTABLE_OBJECT_NAMES:
+                        elif cfg.ENTITY_OBJECT_MAP.get(entity) in cfg.COLLECTABLE_OBJECT_NAMES:
                             lines += self.describe_collectable(tile_coords)
 
         lines.append('// floor and ceiling clipping planes')
@@ -696,19 +672,19 @@ class MapExporter(object):  # TODO
         tilemap = self.tilemap
         tile = tilemap.get(tile_coords)
         enemy = cfg.ENEMY_MAP.get(tile[1])
-
-        if enemy and params.enemy_level_min <= enemy[3] <= params.enemy_level_max and enemy[1] < 4:
-            angle = DIR_TO_YAW[ENEMY_INDEX_TO_DIR[enemy[1]]] if enemy else 0
-            origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
-            return [
-                '{',
-                'classname info_player_deathmatch',
-                'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
-                'angle {:.0f}'.format(angle),
-                '}',
-            ]
-        else:
-            return ()
+        if enemy:
+            direction, level = enemy[1], enemy[3]
+            if params.enemy_level_min <= level <= params.enemy_level_max and direction < 4:
+                angle = DIR_TO_YAW[ENEMY_INDEX_TO_DIR[direction]]
+                origin = self.center_units(tile_coords, self.unit_offsets, center_z=True)
+                return [
+                    '{',
+                    'classname info_player_deathmatch',
+                    'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
+                    'angle {:.0f}'.format(angle),
+                    '}',
+                ]
+        return ()
 
     def describe_dead_enemy_sprite(self, tile_coords):
         cfg = self.cfg
@@ -817,11 +793,12 @@ class MapExporter(object):  # TODO
         for tile_y in range(dimensions[1]):
             for tile_x in range(dimensions[0]):
                 tile_coords = (tile_x, tile_y)
-                tile = tilemap[tile_coords]
+                tile, entity, *_ = tilemap[tile_coords]
 
-                if tile[1]:
-                    partition = find_partition(tile[1], cfg.ENTITY_PARTITION_MAP, count_sign=-1)
-                    description = '// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, tile[1])
+                if entity:
+                    partition = find_partition(entity, cfg.ENTITY_PARTITION_MAP, count_sign=-1,
+                                               cache=self.entity_partition_cache)
+                    description = '// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity)
 
                     if partition == 'start':
                         if player_start_coords is not None:
@@ -839,14 +816,15 @@ class MapExporter(object):  # TODO
                     elif partition == 'pushwall':
                         pushwall_list.append([description, tile_coords])
 
-                    elif partition == 'object' and cfg.ENTITY_OBJECT_MAP[tile[1]] in cfg.COLLECTABLE_OBJECT_NAMES:
+                    elif partition == 'object' and cfg.ENTITY_OBJECT_MAP[entity] in cfg.COLLECTABLE_OBJECT_NAMES:
                         lines.append(description)
                         lines += self.describe_object(tile_coords)
 
-                if tile[0]:
-                    partition = find_partition(tile[0], cfg.TILE_PARTITION_MAP, count_sign=-1)
-                    if tile[0] in cfg.DOOR_MAP:
-                        lines.append('// {} @ {!r} = door 0x{:04X}'.format(partition, tile_coords, tile[0]))
+                if tile:
+                    partition = find_partition(tile, cfg.TILE_PARTITION_MAP, count_sign=-1,
+                                               cache=self.tile_partition_cache)
+                    if tile in cfg.DOOR_MAP:
+                        lines.append('// {} @ {!r} = door 0x{:04X}'.format(partition, tile_coords, tile))
                         lines += self.describe_door(tile_coords)
 
         progression_field = self.compute_progression_field(player_start_coords)
@@ -906,6 +884,8 @@ def build_argument_parser():
     group.add_argument('--wave-rate', default=22050, type=int)
     group.add_argument('--imf-rate', default=700, type=int)
     group.add_argument('--imf2wav-path', default=IMF2WAV_PATH)
+    group.add_argument('--ogg-rate', default=44100, type=int)
+    group.add_argument('--oggenc2-path', default=OGGENC2_PATH)
     group.add_argument('--tile-units', default=96, type=int)
     group.add_argument('--alpha-index', default=0xFF, type=int)
     group.add_argument('--fix-alpha-halo', action='store_true')
@@ -1078,7 +1058,6 @@ def export_sprites(params, cfg, zip_file, vswap_chunks_handler):
         image = sprite.image.convert('RGBA')
         if params.fix_alpha_halo:
             alpha_layer = image.split()[-1].transpose(Image.FLIP_TOP_BOTTOM).resize(scaled_size)
-#             image.putalpha(Image.new('L', image.size, 0xFF))
         image = image.transpose(Image.FLIP_TOP_BOTTOM).resize(scaled_size)
         if params.fix_alpha_halo:
             image = fix_sprite_halo(image, alpha_layer)
@@ -1219,21 +1198,17 @@ def export_musics(params, cfg, zip_file, audio_chunks_handler):
 
     for i in range(count):
         chunk_index = start + i
-        name = cfg.MUSIC_NAMES[i]
-        path = 'music/{}/{}.wav'.format(params.short_name, name)
+        name = cfg.MUSIC_LABELS[i]
+        path = 'music/{}/{}.ogg'.format(params.short_name, name)
         logger.info('Music [%d/%d]: %r', (i + 1), count, path)
         imf_chunk = audio_chunks_handler[chunk_index]
         wave_path = convert_imf_to_wave(imf_chunk, params.imf2wav_path,
-                                        wave_rate=params.wave_rate, imf_rate=params.imf_rate)
+                                        wave_rate=params.ogg_rate, imf_rate=params.imf_rate)
         try:
-            with open(wave_path, 'rb') as wave_file:
-                wave_samples = wave_file.read()
-            zip_file.writestr(path, wave_samples)
+            ogg_path = convert_wave_to_ogg(wave_path, params.oggenc2_path)
+            zip_file.write(ogg_path, path)
         finally:
-            try:
-                os.unlink(wave_path)
-            except:
-                pass
+            _force_unlink(wave_path, ogg_path)
 
     logger.info('Done')
     _sep()
@@ -1248,20 +1223,16 @@ def export_adlib_sounds(params, cfg, zip_file, audio_chunks_handler):
 
     for i, sound in enumerate(adlib_manager):
         name = cfg.ADLIB_SOUND_NAMES[i]
-        path = 'sound/{}/adlib/{}.wav'.format(params.short_name, name)
+        path = 'sound/{}/adlib/{}.ogg'.format(params.short_name, name)
         logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
         imf_chunk = sound.to_imf_chunk()
         wave_path = convert_imf_to_wave(imf_chunk, params.imf2wav_path,
-                                        wave_rate=params.wave_rate, imf_rate=params.imf_rate)
+                                        wave_rate=params.ogg_rate, imf_rate=params.imf_rate)
         try:
-            with open(wave_path, 'rb') as wave_file:
-                wave_samples = wave_file.read()
-            zip_file.writestr(path, wave_samples)
+            ogg_path = convert_wave_to_ogg(wave_path, params.oggenc2_path)
+            zip_file.write(ogg_path, path)
         finally:
-            try:
-                os.unlink(wave_path)
-            except:
-                pass
+            _force_unlink(wave_path, ogg_path)
 
     logger.info('Done')
     _sep()
@@ -1307,7 +1278,7 @@ def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):  # TODO
         path = 'maps/{}/{}.map'.format(params.short_name, tilemap.name)
         zip_file.writestr(path, description)
 
-        break  # XXX
+#         break  # XXX
 
     logger.info('Done')
     _sep()
@@ -1332,18 +1303,20 @@ def main(*args):
 
     vswap_data_path = os.path.join(params.input_folder, params.vswap_data)
     logger.info('Precaching VSwap chunks: <data>=%r', vswap_data_path)
-    vswap_chunks_handler = pywolf.persistence.PrecachedVSwapChunksHandler()
+    vswap_chunks_handler = pywolf.persistence.VSwapChunksHandler()
     with open(vswap_data_path, 'rb') as data_file:
         vswap_chunks_handler.load(data_file)
+        vswap_chunks_handler = pywolf.persistence.PrecachedChunksHandler(vswap_chunks_handler)
     _sep()
 
     audio_data_path = os.path.join(params.input_folder, params.audio_data)
     audio_header_path = os.path.join(params.input_folder, params.audio_header)
     logger.info('Precaching audio chunks: <data>=%r, <header>=%r', audio_data_path, audio_header_path)
-    audio_chunks_handler = pywolf.persistence.PrecachedAudioChunksHandler()
+    audio_chunks_handler = pywolf.persistence.AudioChunksHandler()
     with open(audio_data_path, 'rb') as (data_file
     ),   open(audio_header_path, 'rb') as header_file:
         audio_chunks_handler.load(data_file, header_file)
+        audio_chunks_handler = pywolf.persistence.PrecachedChunksHandler(audio_chunks_handler)
     _sep()
 
     graphics_data_path = os.path.join(params.input_folder, params.graphics_data)
@@ -1351,20 +1324,22 @@ def main(*args):
     graphics_huffman_path = os.path.join(params.input_folder, params.graphics_huffman)
     logger.info('Precaching graphics chunks: <data>=%r, <header>=%r, <huffman>=%r',
                 graphics_data_path, graphics_header_path, graphics_huffman_path)
-    graphics_chunks_handler = pywolf.persistence.PrecachedGraphicsChunksHandler()
+    graphics_chunks_handler = pywolf.persistence.GraphicsChunksHandler()
     with open(graphics_data_path, 'rb') as (data_file
     ),   open(graphics_header_path, 'rb') as (header_file
     ),   open(graphics_huffman_path, 'rb') as huffman_file:
         graphics_chunks_handler.load(data_file, header_file, huffman_file, cfg.GRAPHICS_PARTITIONS_MAP)
+        graphics_chunks_handler = pywolf.persistence.PrecachedChunksHandler(graphics_chunks_handler)
     _sep()
 
     maps_data_path = os.path.join(params.input_folder, params.maps_data)
     maps_header_path = os.path.join(params.input_folder, params.maps_header)
     logger.info('Precaching map chunks: <data>=%r, <header>=%r', maps_data_path, maps_header_path)
-    tilemap_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
+    tilemap_chunks_handler = pywolf.persistence.MapChunksHandler()
     with open(maps_data_path, 'rb') as (data_file
     ),   open(maps_header_path, 'rb') as header_file:
         tilemap_chunks_handler.load(data_file, header_file)
+        tilemap_chunks_handler = pywolf.persistence.PrecachedChunksHandler(tilemap_chunks_handler)
     _sep()
 
     pk3_path = os.path.join(params.output_folder, params.output_pk3)
@@ -1372,20 +1347,18 @@ def main(*args):
     with zipfile.ZipFile(pk3_path, 'w', zipfile.ZIP_DEFLATED) as pk3_file:
         _sep()
         export_tilemaps(params, cfg, pk3_file, tilemap_chunks_handler)
-#         export_shaders(params, cfg, pk3_file)
-#         export_textures(params, cfg, pk3_file, vswap_chunks_handler)
-#         export_sprites(params, cfg, pk3_file, vswap_chunks_handler)
-#        export_fonts(params, cfg, pk3_file, graphics_chunks_handler)
-#        export_pictures(params, cfg, pk3_file, graphics_chunks_handler)
-#        export_tile8(params, cfg, pk3_file, graphics_chunks_handler)
-#        export_screens(params, cfg, pk3_file, graphics_chunks_handler)
-#        export_helparts(params, cfg, pk3_file, graphics_chunks_handler)
-#        export_endarts(params, cfg, pk3_file, graphics_chunks_handler)
-
-#         export_sampled_sounds(params, cfg, pk3_file, vswap_chunks_handler)
-#         export_musics(params, cfg, pk3_file, audio_chunks_handler)
-#         export_adlib_sounds(params, cfg, pk3_file, audio_chunks_handler)
-#         export_buzzer_sounds(params, cfg, pk3_file, audio_chunks_handler)
+        export_shaders(params, cfg, pk3_file)
+        export_textures(params, cfg, pk3_file, vswap_chunks_handler)
+        export_sprites(params, cfg, pk3_file, vswap_chunks_handler)
+        export_pictures(params, cfg, pk3_file, graphics_chunks_handler)
+        export_tile8(params, cfg, pk3_file, graphics_chunks_handler)
+        export_screens(params, cfg, pk3_file, graphics_chunks_handler)
+        export_helparts(params, cfg, pk3_file, graphics_chunks_handler)
+        export_endarts(params, cfg, pk3_file, graphics_chunks_handler)
+        export_sampled_sounds(params, cfg, pk3_file, vswap_chunks_handler)
+        export_adlib_sounds(params, cfg, pk3_file, audio_chunks_handler)
+        export_buzzer_sounds(params, cfg, pk3_file, audio_chunks_handler)
+        export_musics(params, cfg, pk3_file, audio_chunks_handler)
 
     logger.info('PK3 archived successfully')
 

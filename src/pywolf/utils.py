@@ -36,35 +36,42 @@ def is_in_partition(index, *partitions):
     return False
 
 
-def find_partition(index, partition_map, count_sign=1):
-    if count_sign > 0:
-        maximum = 0
-        found = None
-        for key, value in partition_map.items():
-            start, count = value
-            if start <= index < (start + count) and maximum < count:
-                maximum = count
-                found = key
-        if found is not None:
-            return found
-    elif count_sign < 0:
-        maximum = 0
-        found = None
-        for key, value in partition_map.items():
-            start, count = value
-            if start <= index < (start + count) and -count < maximum:
-                maximum = -count
-                found = key
-        if found is not None:
-            return found
-    else:
-        for key, value in partition_map.items():
-            start, count = value
-            if start <= index < (start + count):
-                return key
-    print(index, count_sign)#XXX
-    print(partition_map)#XXX
-    raise ValueError(index)
+def find_partition(index, partition_map, count_sign=1, cache=None):
+    found = None
+    if cache is not None:
+        found = cache.get(index)
+
+    if found is None:
+        if count_sign > 0:
+            maximum = 0
+            found = None
+            for key, value in partition_map.items():
+                start, count = value
+                if start <= index < (start + count) and maximum < count:
+                    maximum = count
+                    found = key
+
+        elif count_sign < 0:
+            maximum = 0
+            found = None
+            for key, value in partition_map.items():
+                start, count = value
+                if start <= index < (start + count) and -count < maximum:
+                    maximum = -count
+                    found = key
+
+        else:
+            for key, value in partition_map.items():
+                start, count = value
+                if start <= index < (start + count):
+                    found = key
+
+    if found is None:
+        raise ValueError(index)
+
+    if cache is not None:
+        cache[index] = found
+    return found
 
 
 def huffman_expand(data, expanded_size, nodes):
@@ -187,7 +194,7 @@ def rlew_expand(data, tag):
     return output.tobytes()
 
 
-def stream_bound(stream, offset=None, size=None):
+def stream_fit(stream, offset=None, size=None):
     if offset is None:
         offset = stream.tell()
     else:
@@ -298,9 +305,9 @@ class BinaryResource(object):
         return stream.getvalue()
 
 
-class ResourceManager(object):  # TODO: remove cache
+class ResourceManager(object):
 
-    def __init__(self, chunks_handler, start=None, count=None, cache=None):
+    def __init__(self, chunks_handler, start=None, count=None):
         if start is None:
             start = 0
         if count is None:
@@ -311,7 +318,6 @@ class ResourceManager(object):  # TODO: remove cache
         self._chunks_handler = chunks_handler
         self._start = start
         self._count = count
-        self._cache = {} if cache is None else cache
 
     def __len__(self):
         return self._count
@@ -323,23 +329,88 @@ class ResourceManager(object):  # TODO: remove cache
         return sequence_getitem(key, len(self), self._get)
 
     def _get(self, index):
-        chunks_handler = self._chunks_handler
-        start = self._start
-        cache = self._cache
-
-        try:
-            item = cache[index]
-        except KeyError:
-            chunk = chunks_handler[start + index]
-            item = self._build_resource(index, chunk)
-            cache[index] = item
+        chunk = self._chunks_handler[self._start + index]
+        item = self._build_resource(index, chunk)
         return item
 
     def _build_resource(self, index, chunk):
         return chunk
 
-    def _destroy_resource(self, index):  # TODO: add support (here and into the cache)
-        raise NotImplementedError
+
+class ResourcePrecache(ResourceManager):
+
+    def __init__(self, wrapped=None, cache=None):
+        self._wrapped = wrapped
+        self._cache = [] if cache is None else cache
+
+        if wrapped is not None:
+            self.cache_all()
+        else:
+            self.clear()
+
+    def __len__(self):
+        return len(self._wrapped)
+
+    def __iter__(self):
+        yield from self._cache
+
+    def __getitem__(self, key):
+        return self._cache[key]
+
+    def assign(self, wrapped):
+        if self._wrapped is not None:
+            raise ValueError('already wrapped')
+        self._wrapped = wrapped
 
     def clear(self):
         self._cache.clear()
+
+    def cache_all(self):
+        self.clear()
+        self._cache.extend(self._wrapped)
+
+
+class ResourceCache(ResourceManager):
+
+    def __init__(self, wrapped=None, cache=None):
+        self._wrapped = wrapped
+        self._cache = {} if cache is None else cache
+        self.clear()
+
+    def __len__(self):
+        return len(self._wrapped)
+
+    def __iter__(self):
+        yield from (self[index] for index in range(len(self)))
+
+    def __getitem__(self, key):
+        try:
+            return self._cache[key]
+        except KeyError:
+            item = self._wrapped[key]
+            self._cache[key] = item
+            return item
+
+    def assign(self, wrapped):
+        if self._wrapped is not None:
+            raise ValueError('already wrapped')
+        self._wrapped = wrapped
+
+    def clear(self):
+        self._cache.clear()
+
+    def cache_all(self):
+        self.clear()
+        self._cache.update(enumerate(self._wrapped))
+
+    def force_unload(self, index):
+        self._cache.remove(index)
+
+    def force_load(self, index):
+        self.force_unload(index)
+        return self[index]
+
+    def load_only(self, indices):
+        self.clear()
+        self._cache.update((index, self._wrapped[index]) for index in indices)
+

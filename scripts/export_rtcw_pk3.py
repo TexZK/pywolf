@@ -515,7 +515,7 @@ def build_argument_parser():
     group.add_argument('--output-pk3', required=True)
 
     group = parser.add_argument_group('settings')
-    group.add_argument('--cfg', default='wl6')
+    group.add_argument('--cfg')
     group.add_argument('--short-name', default='wolf3d')
     group.add_argument('--wave-rate', default=44100, type=int)
     group.add_argument('--imf-rate', default=700, type=int)
@@ -937,18 +937,20 @@ def main(*args):
 
     vswap_data_path = os.path.join(params.input_folder, params.vswap_data)
     logger.info('Precaching VSwap chunks: <data>=%r', vswap_data_path)
-    vswap_chunks_handler = pywolf.persistence.PrecachedVSwapChunksHandler()
+    vswap_chunks_handler = pywolf.persistence.VSwapChunksHandler()
     with open(vswap_data_path, 'rb') as data_file:
         vswap_chunks_handler.load(data_file)
+        vswap_chunks_handler = pywolf.persistence.PrecachedChunksHandler(vswap_chunks_handler)
     _sep()
 
     audio_data_path = os.path.join(params.input_folder, params.audio_data)
     audio_header_path = os.path.join(params.input_folder, params.audio_header)
     logger.info('Precaching audio chunks: <data>=%r, <header>=%r', audio_data_path, audio_header_path)
-    audio_chunks_handler = pywolf.persistence.PrecachedAudioChunksHandler()
+    audio_chunks_handler = pywolf.persistence.AudioChunksHandler()
     with open(audio_data_path, 'rb') as (data_file
     ),   open(audio_header_path, 'rb') as header_file:
         audio_chunks_handler.load(data_file, header_file)
+        audio_chunks_handler = pywolf.persistence.PrecachedChunksHandler(audio_chunks_handler)
     _sep()
 
     graphics_data_path = os.path.join(params.input_folder, params.graphics_data)
@@ -956,20 +958,22 @@ def main(*args):
     graphics_huffman_path = os.path.join(params.input_folder, params.graphics_huffman)
     logger.info('Precaching graphics chunks: <data>=%r, <header>=%r, <huffman>=%r',
                 graphics_data_path, graphics_header_path, graphics_huffman_path)
-    graphics_chunks_handler = pywolf.persistence.PrecachedGraphicsChunksHandler()
+    graphics_chunks_handler = pywolf.persistence.GraphicsChunksHandler()
     with open(graphics_data_path, 'rb') as (data_file
     ),   open(graphics_header_path, 'rb') as (header_file
     ),   open(graphics_huffman_path, 'rb') as huffman_file:
         graphics_chunks_handler.load(data_file, header_file, huffman_file, cfg.GRAPHICS_PARTITIONS_MAP)
+        graphics_chunks_handler = pywolf.persistence.PrecachedChunksHandler(graphics_chunks_handler)
     _sep()
 
     maps_data_path = os.path.join(params.input_folder, params.maps_data)
     maps_header_path = os.path.join(params.input_folder, params.maps_header)
     logger.info('Precaching map chunks: <data>=%r, <header>=%r', maps_data_path, maps_header_path)
-    tilemap_chunks_handler = pywolf.persistence.PrecachedMapChunksHandler()
+    tilemap_chunks_handler = pywolf.persistence.MapChunksHandler()
     with open(maps_data_path, 'rb') as (data_file
     ),   open(maps_header_path, 'rb') as header_file:
         tilemap_chunks_handler.load(data_file, header_file)
+        tilemap_chunks_handler = pywolf.persistence.PrecachedChunksHandler(tilemap_chunks_handler)
     _sep()
 
     pk3_path = os.path.join(params.output_folder, params.output_pk3)
