@@ -2132,7 +2132,7 @@ COLLECTABLE_OBJECT_NAMES = [
     'silver_key',
 ]
 
-OBJECT_LIGHT_MAP = {  # name: (height, amount, color)
+OBJECT_LIGHT_MAP = {  # name: (normalized_height, amount, color)
     'ceiling_light': (0.8, 100, (1.0, 1.0, 0.9)),
     'chandelier':    (0.8, 200, (1.0, 1.0, 0.8)),
     'lamp':          (0.6, 100, (1.0, 1.0, 0.9)),

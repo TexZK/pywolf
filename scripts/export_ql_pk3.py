@@ -15,6 +15,7 @@ import zipfile
 
 from PIL import Image
 
+import numpy as np
 from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave, convert_wave_to_ogg
 import pywolf.game
 from pywolf.graphics import write_targa_bgrx, build_color_image
@@ -693,7 +694,7 @@ class MapExporter(object):  # TODO
         tile = tilemap.get(tile_coords)
         enemy = cfg.ENEMY_MAP.get(tile[1])
 
-        if enemy:  # and not (params.enemy_level_min <= enemy[3] <= params.enemy_level_max):
+        if enemy:
             name = enemy[0] + '__dead'
             face_shader = '{}_enemy/{}'.format(params.short_name, name)
             return self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets)
@@ -701,9 +702,30 @@ class MapExporter(object):  # TODO
             return ()
 
     def describe_object(self, tile_coords):
-        return ()  # TODO
+        cfg = self.cfg
+        params = self.params
+        tilemap = self.tilemap
+        tile = tilemap.get(tile_coords)
+        lines = []
+        name = cfg.ENTITY_OBJECT_MAP.get(tile[1])
+        center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
 
-    def describe_pushwall(self, tile_coords, progression_field):  # TODO
+        light = cfg.OBJECT_LIGHT_MAP.get(name)
+        if light:
+            normalized_height, amount, color = light
+            origin = (center_x, center_y, (normalized_height * params.tile_units))
+            lines += [
+                '{',
+                'classname light',
+                'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
+                'light "{:d}"'.format(amount),
+                'color "{:f} {:f} {:f}"'.format(*color),
+                '}',
+            ]
+
+        return lines
+
+    def describe_pushwall(self, tile_coords, progression_field):
         params = self.params
         cfg = self.cfg
         tile = self.tilemap[tile_coords]
@@ -816,7 +838,7 @@ class MapExporter(object):  # TODO
                     elif partition == 'pushwall':
                         pushwall_list.append([description, tile_coords])
 
-                    elif partition == 'object' and cfg.ENTITY_OBJECT_MAP[entity] in cfg.COLLECTABLE_OBJECT_NAMES:
+                    elif partition == 'object':
                         lines.append(description)
                         lines += self.describe_object(tile_coords)
 
@@ -1016,27 +1038,53 @@ def export_shaders(params, cfg, zip_file):
     _sep()
 
 
-def fix_sprite_halo(rgba_image, alpha_layer):  # TODO: optimize with numpy arrays
-    width, height = rgba_image.size
-    outline = [(x, y) for y in [-1, 0, 1] for x in [-1, 0, 1] if x or y]
+def image_to_array(image, shape, dtype=np.uint8):
+    return np.array(image.getdata(), dtype).reshape(shape)
 
-    for y in range(height):
-        for x in range(width):
-            if not alpha_layer.getpixel((x, y)):
-                r, g, b = 0, 0, 0
-                count = 0
-                for xi, yi in outline:
-                    xb = x + xi
-                    yb = y + yi
-                    if 0 <= yb < height and 0 <= xb < width and alpha_layer.getpixel((xb, yb)):
-                        color = rgba_image.getpixel((xb, yb))
-                        r += color[0]
-                        g += color[1]
-                        b += color[2]
-                        count += 1
-                if count:
-                    rgba_image.putpixel((x, y), ((r // count), (g // count), (b // count), 0))
-    return rgba_image
+
+def array_to_rgbx(arr, size, channels):
+    assert 3 <= channels <= 4
+    mode = 'RGBA' if channels == 4 else 'RGB'
+    arr = arr.reshape(arr.shape[0] * arr.shape[1], arr.shape[2]).astype(np.uint8)
+    if channels == 4 and len(arr[0]) == 3:  # FIXME: make generic, this is only for RGB->RGBA
+        arr = np.c_[arr, 255 * np.ones((len(arr), 1), np.uint8)]
+    return Image.frombuffer(mode, size, arr.tostring(), 'raw', mode, 0, 1)
+
+
+def fix_sprite_halo(rgba_image, alpha_layer):
+    alpha_layer = image_to_array(alpha_layer, rgba_image.size)
+    mask = (alpha_layer != 0).astype(np.uint8)
+    source = image_to_array(rgba_image, rgba_image.size + (4,))
+    source *= mask[..., None].repeat(4, axis=2)
+
+    accum = np.zeros_like(source, np.uint16)
+    accum[ :-1,  :  ] += source[1:  ,  :  ]
+    accum[1:  ,  :  ] += source[ :-1,  :  ]
+    accum[ :  ,  :-1] += source[ :  , 1:  ]
+    accum[ :  , 1:  ] += source[ :  ,  :-1]
+    accum[ :-1,  :-1] += source[1:  , 1:  ]
+    accum[ :-1, 1:  ] += source[1:  ,  :-1]
+    accum[1:  ,  :-1] += source[ :-1, 1:  ]
+    accum[1:  , 1:  ] += source[ :-1,  :-1]
+
+    count = np.zeros_like(mask)
+    count[ :-1,  :  ] += mask[1:  ,  :  ]
+    count[1:  ,  :  ] += mask[ :-1,  :  ]
+    count[ :  ,  :-1] += mask[ :  , 1:  ]
+    count[ :  , 1:  ] += mask[ :  ,  :-1]
+    count[ :-1,  :-1] += mask[1:  , 1:  ]
+    count[ :-1, 1:  ] += mask[1:  ,  :-1]
+    count[1:  ,  :-1] += mask[ :-1, 1:  ]
+    count[1:  , 1:  ] += mask[ :-1,  :-1]
+
+    count_div = np.maximum(np.ones_like(count), count)
+    count_div = count_div[..., None].repeat(4, axis=2)
+    accum = (accum // count_div).astype(np.uint8)
+    accum[..., 3] = 0
+    accum[mask != 0] = source[mask != 0]
+
+    result = array_to_rgbx(accum, rgba_image.size, 4)
+    return result
 
 
 def export_sprites(params, cfg, zip_file, vswap_chunks_handler):
@@ -1277,8 +1325,6 @@ def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):  # TODO
 
         path = 'maps/{}/{}.map'.format(params.short_name, tilemap.name)
         zip_file.writestr(path, description)
-
-#         break  # XXX
 
     logger.info('Done')
     _sep()
