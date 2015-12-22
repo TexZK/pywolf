@@ -23,6 +23,40 @@ import pywolf.persistence
 from pywolf.utils import find_partition, load_as_module
 
 
+OBJECT_LIGHT_MAP = {  # name: (normalized_height, amount, color)
+    'ceiling_light': (0.8, 100, (1.0, 1.0, 0.9)),
+    'chandelier':    (0.8, 200, (1.0, 1.0, 0.8)),
+    'lamp':          (0.6, 100, (1.0, 1.0, 0.9)),
+
+    'chalice': (0.2, 30, (1.0, 1.0, 0.8)),
+    'cross':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'crown':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'jewels':  (0.2, 30, (1.0, 1.0, 0.8)),
+
+    'extra_life': (0.3, 30, (0.8, 0.8, 1.0)),
+    'gold_key':   (0.2, 30, (1.0, 1.0, 0.8)),
+    'medkit':     (0.2, 30, (1.0, 1.0, 1.0)),
+    'silver_key': (0.2, 30, (0.8, 1.0, 1.0)),
+}
+
+COLLECTABLE_ENTITY_MAP = {  # (name, wait)
+    'ammo':       ('ammo_pack', 10),
+    'ammo_used':  ('ammo_pack', 10),
+    'chaingun':   ('weapon_chaingun', 5),
+    'chalice':    ('item_armor_shard', 25),
+    'cross':      ('item_armor_shard', 25),
+    'crown':      ('item_armor_shard', 25),
+    'dog_food':   ('item_health_small', 35),
+    'extra_life': ('item_health_mega', 35),
+    'food':       ('item_health', 35),
+    'gold_key':   ('item_haste', 120),
+    'jewels':     ('item_armor_shard', 25),
+    'machinegun': ('weapon_hmg', 5),
+    'medkit':     ('item_health_large', 35),
+    'silver_key': ('item_quad', 120),
+}
+
+
 IMF2WAV_PATH = os.path.join('..', 'tools', 'imf2wav')
 OGGENC2_PATH = os.path.join('..', 'tools', 'oggenc2')
 
@@ -162,11 +196,14 @@ def describe_cuboid_brush(face_vertices, face_shaders, shader_scales, format_lin
 
 class MapExporter(object):  # TODO
 
-    def __init__(self, params, cfg, tilemap, tilemap_index):
+    def __init__(self, params, cfg, tilemap, episode_index, submap_index):
         self.params = params
         self.cfg = cfg
         self.tilemap = tilemap
-        self.tilemap_index = tilemap_index
+        self.episode_index = episode_index
+        self.submap_index = submap_index
+        episode = cfg.EPISODES[episode_index]
+        self.tilemap_index = episode[0] + submap_index
 
         dimensions = tilemap.dimensions
         half_units = params.tile_units / 2
@@ -306,21 +343,115 @@ class MapExporter(object):  # TODO
 
         return lines
 
-    def describe_collectable(self, tile_coords):
+    def describe_collectable(self, tile_coords):  # TODO
         params = self.params
         cfg = self.cfg
         entity = self.tilemap[tile_coords][1]
+        center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
         name = cfg.ENTITY_OBJECT_MAP[entity]
-        lines = []
+        give_name, give_wait = COLLECTABLE_ENTITY_MAP[name]
 
-        if name in cfg.SOLID_OBJECT_NAMES:
-            face_shaders = ['common/clip'] * 6
-            lines.extend(self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets))
+        trigger_begin = [
+            '{',
+            'classname trigger_multiple',
+            'target "collectable_{:.0f}_{:.0f}_pickup"'.format(*tile_coords),
+            'wait {:f}'.format(give_wait),
+        ]
+        trigger_end = ['}']
 
+        face_shaders = ['common/trigger'] * 6
+        trigger_brush = self.describe_textured_cube(tile_coords, face_shaders, self.unit_offsets)
+
+        speaker_open_entity = [
+            '{',
+            'classname target_speaker',
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(center_x, center_y, center_z),
+            'targetname "collectable_{:.0f}_{:.0f}_pickup"'.format(*tile_coords),
+            'noise "sound/{}/{}"'.format(params.short_name, 'adlib/{}'.format(cfg.COLLECTABLE_PICKUP_SOUNDS[name])),
+            '}',
+        ]
+
+        underworld_z = center_z + params.underworld_offset
+
+        give_entity = [
+            '{',
+            'classname target_give',
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(center_x, center_y, underworld_z),
+            'targetname "collectable_{:.0f}_{:.0f}_pickup"'.format(*tile_coords),
+            'target "collectable_{:.0f}_{:.0f}_give"'.format(*tile_coords),
+            '}',
+        ]
+
+        target_entity = [
+            '{',
+            'classname {}'.format(give_name),
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(center_x, center_y, underworld_z),
+            'targetname "collectable_{:.0f}_{:.0f}_give"'.format(*tile_coords),
+            '}'
+        ]
+
+        delay_entity = [
+            '{',
+            'classname target_delay',
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(center_x, center_y, center_z),
+            'targetname "collectable_{:.0f}_{:.0f}_pickup"'.format(*tile_coords),
+            'target "collectable_{:.0f}_{:.0f}_respawn"'.format(*tile_coords),
+            'wait {:f}'.format(give_wait),
+            '}',
+        ]
+
+        speaker_close_entity = [  # TODO
+            '{',
+            'classname target_speaker',
+            'origin "{:.0f} {:.0f} {:.0f}"'.format(center_x, center_y, center_z),
+            'targetname "collectable_{:.0f}_{:.0f}_respawn"'.format(*tile_coords),
+            'noise "sound/{}/{}"'.format(params.short_name, 'adlib/menu__exit'),
+            '}',
+        ]
+
+        # Door entity
+        door_begin = [
+            '{',
+            'classname func_door',
+            'targetname "collectable_{:.0f}_{:.0f}_pickup"'.format(*tile_coords),
+            'angle -2',
+            'lip 0',
+            'dmg 0',
+            'health 0',
+            'wait {:f}'.format(give_wait),
+            'speed 32767',
+        ]
+        door_end = ['}']
+
+        # Sprite brush
         face_shader = '{}_collectable/{}'.format(params.short_name, name)
-        lines.extend(self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets))
+        door_brush = self.describe_textured_sprite(tile_coords, face_shader, self.unit_offsets)
 
-        return lines
+        # Underworld brush
+        face_shaders = ['common/nodrawnonsolid'] * 6
+        unit_offsets = list(self.unit_offsets)
+        unit_offsets[2] += params.underworld_offset
+        door_underworld_brush = self.describe_textured_cube(tile_coords, face_shaders, unit_offsets)
+
+        light = OBJECT_LIGHT_MAP.get(name)
+        if light:
+            normalized_height, amount, color = light
+            origin = (center_x, center_y, (normalized_height * params.tile_units))
+            light_entity = [
+                '{',
+                'classname light',
+                'origin "{:.0f} {:.0f} {:.0f}"'.format(*origin),
+                'light "{:d}"'.format(amount),
+                'color "{:f} {:f} {:f}"'.format(*color),
+                '}',
+            ]
+        else:
+            light_entity = []
+
+        return (trigger_begin + trigger_brush + trigger_end +
+                speaker_open_entity + delay_entity + speaker_close_entity +
+                give_entity + target_entity + light_entity +
+                door_begin + door_brush + door_underworld_brush + door_end)
 
     def describe_door(self, tile_coords):
         params = self.params
@@ -412,7 +543,7 @@ class MapExporter(object):  # TODO
         door_brush = describe_cuboid_brush(face_vertices, face_shaders, shader_scales, flip_directions=(EAST, WEST))
 
         # Underworld brush
-        face_shaders = ['common/caulk'] * 6
+        face_shaders = ['common/nodrawnonsolid'] * 6
         unit_offsets = list(self.unit_offsets)
         unit_offsets[2] += params.underworld_offset
         door_underworld_brush = self.describe_textured_cube(tile_coords, face_shaders, unit_offsets)
@@ -554,16 +685,13 @@ class MapExporter(object):  # TODO
                     partition = find_partition(entity, cfg.ENTITY_PARTITION_MAP, count_sign=-1,
                                                cache=self.entity_partition_cache)
 
-                    if partition == 'enemy':
+                    if cfg.ENTITY_OBJECT_MAP.get(entity) in cfg.STATIC_OBJECT_NAMES:
+                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity))
+                        lines += self.describe_sprite(tile_coords)
+
+                    elif partition == 'enemy':
                         lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity))
                         lines += self.describe_dead_enemy_sprite(tile_coords)
-
-                    elif partition == 'object':
-                        lines.append('// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity))
-                        if cfg.ENTITY_OBJECT_MAP.get(entity) in cfg.STATIC_OBJECT_NAMES:
-                            lines += self.describe_sprite(tile_coords)
-                        elif cfg.ENTITY_OBJECT_MAP.get(entity) in cfg.COLLECTABLE_OBJECT_NAMES:
-                            lines += self.describe_collectable(tile_coords)
 
         lines.append('// floor and ceiling clipping planes')
         lines += self.describe_floor_ceiling_clipping()
@@ -710,7 +838,7 @@ class MapExporter(object):  # TODO
         name = cfg.ENTITY_OBJECT_MAP.get(tile[1])
         center_x, center_y, center_z = self.center_units(tile_coords, self.unit_offsets, center_z=True)
 
-        light = cfg.OBJECT_LIGHT_MAP.get(name)
+        light = OBJECT_LIGHT_MAP.get(name)
         if light:
             normalized_height, amount, color = light
             origin = (center_x, center_y, (normalized_height * params.tile_units))
@@ -723,6 +851,7 @@ class MapExporter(object):  # TODO
                 '}',
             ]
 
+        lines.append('// TODO')
         return lines
 
     def describe_pushwall(self, tile_coords, progression_field):
@@ -794,7 +923,7 @@ class MapExporter(object):  # TODO
             stop_coords[0] += xd
             stop_coords[1] += yd
             steps += 1
-        face_shaders = ['common/caulk'] * 6
+        face_shaders = ['common/nodrawnonsolid'] * 6
         unit_offsets = list(self.unit_offsets)
         unit_offsets[2] += params.underworld_offset
         door_underworld_brush = self.describe_textured_cube(stop_coords, face_shaders, unit_offsets)
@@ -821,6 +950,7 @@ class MapExporter(object):  # TODO
                     partition = find_partition(entity, cfg.ENTITY_PARTITION_MAP, count_sign=-1,
                                                cache=self.entity_partition_cache)
                     description = '// {} @ {!r} = entity 0x{:04X}'.format(partition, tile_coords, entity)
+                    entity_object = cfg.ENTITY_OBJECT_MAP.get(entity)
 
                     if partition == 'start':
                         if player_start_coords is not None:
@@ -837,6 +967,10 @@ class MapExporter(object):  # TODO
 
                     elif partition == 'pushwall':
                         pushwall_list.append([description, tile_coords])
+
+                    elif entity_object in cfg.COLLECTABLE_OBJECT_NAMES:
+                        lines.append(description)
+                        lines += self.describe_collectable(tile_coords)
 
                     elif partition == 'object':
                         lines.append(description)
@@ -872,8 +1006,7 @@ class MapExporter(object):  # TODO
 
     def describe_tilemap(self):
         tilemap = self.tilemap
-        tilemap_index = self.tilemap_index
-        lines = ['// map #{}: "{}"'.format(tilemap_index, tilemap.name)]
+        lines = ['// map #e{}m{}: "{}"'.format(self.episode_index + 1, self.submap_index + 1, tilemap.name)]
         lines += self.describe_worldspawn()
         lines += self.describe_entities()
         return lines
@@ -1053,7 +1186,8 @@ def array_to_rgbx(arr, size, channels):
 
 def fix_sprite_halo(rgba_image, alpha_layer):
     alpha_layer = image_to_array(alpha_layer, rgba_image.size)
-    mask = (alpha_layer != 0).astype(np.uint8)
+    mask_cells = (alpha_layer != 0)
+    mask = mask_cells.astype(np.uint8)
     source = image_to_array(rgba_image, rgba_image.size + (4,))
     source *= mask[..., None].repeat(4, axis=2)
 
@@ -1081,7 +1215,7 @@ def fix_sprite_halo(rgba_image, alpha_layer):
     count_div = count_div[..., None].repeat(4, axis=2)
     accum = (accum // count_div).astype(np.uint8)
     accum[..., 3] = 0
-    accum[mask != 0] = source[mask != 0]
+    accum[mask_cells] = source[mask_cells]
 
     result = array_to_rgbx(accum, rgba_image.size, 4)
     return result
@@ -1305,26 +1439,35 @@ def export_buzzer_sounds(params, cfg, zip_file, audio_chunks_handler):
     _sep()
 
 
-def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):  # TODO
+def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):
     logger = logging.getLogger()
     logger.info('Exporting tilemaps (Q3Map2 *.map)')
 
-    start, count = (0, 60)  # FIXME: replace with map descriptors
+    start, count = 0, sum(episode[1] for episode in cfg.EPISODES)
     tilemap_manager = pywolf.game.TileMapManager(audio_chunks_handler, start, count)
 
-    for i, tilemap in enumerate(tilemap_manager):
-        folder = os.path.join(params.output_folder, 'maps', params.short_name)
-        os.makedirs(folder, exist_ok=True)
-        path = os.path.join(folder, (tilemap.name + '.map'))
-        logger.info('TileMap [%d/%d]: %r', (i + 1), count, path)
+    i = 1
+    for episode_index, episode in enumerate(cfg.EPISODES):
+        for submap_index in range(episode[1]):
+            tilemap_index = episode[0] + submap_index
+            tilemap = tilemap_manager[tilemap_index]
+            name = '{}_e{}m{}'.format(params.short_name, episode_index + 1, submap_index + 1)
+            folder = os.path.join(params.output_folder, 'maps')
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, (name + '.map'))
+            logger.info('TileMap [%d/%d]: %r = %r', i, count, path, tilemap.name)
 
-        exporter = MapExporter(params, cfg, tilemap, i)
-        description = '\n'.join(exporter.describe_tilemap())
-        with open(path, 'wt') as map_file:
-            map_file.write(description)
+            exporter = MapExporter(params, cfg, tilemap, episode_index, submap_index)
+            description = '\n'.join(exporter.describe_tilemap())
+            with open(path, 'wt') as map_file:
+                map_file.write(description)
 
-        path = 'maps/{}/{}.map'.format(params.short_name, tilemap.name)
-        zip_file.writestr(path, description)
+            path = 'maps/{}.map'.format(name)
+            zip_file.writestr(path, description)
+            i += 1
+
+#             break  # XXX
+#         break  # XXX
 
     logger.info('Done')
     _sep()

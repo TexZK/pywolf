@@ -1574,7 +1574,7 @@ SOUND_NAMES = [
     'dog__wake',
     'score__bonus_tens',
     'score__bonus_got',
-    'pickup__life',
+    'pickup__extra_life',
     'pickup__crown',
     'pushwall__move',
     'score__no_bonus',
@@ -2039,7 +2039,14 @@ TILEMAP_MUSIC_LABELS = [
 
 TILEMAP_MUSIC_INDICES = [MUSIC_LABELS.index(label) for label in TILEMAP_MUSIC_LABELS]
 
-# TODO: make map descriptor instead of dedicated arrays
+EPISODES = [  # (start, count, name)
+    ( 0, 10, 'Escape from Wolfenstein'),
+    (10, 10, 'Operation: Eisenfaust'),
+    (20, 10, 'Die, Fuhrer, Die!'),
+    (30, 10, 'A Dark Secret'),
+    (40, 10, 'Trail of the Madman'),
+    (50, 10, 'Confrontation'),
+]
 
 FLOOR_COLORS = [0x19] * (10 * 6)
 
@@ -2117,7 +2124,7 @@ SOLID_OBJECT_NAMES = [
 
 COLLECTABLE_OBJECT_NAMES = [
     'ammo',
-    'ammo_used'
+    'ammo_used',
     'chaingun',
     'chalice',
     'cross',
@@ -2132,20 +2139,21 @@ COLLECTABLE_OBJECT_NAMES = [
     'silver_key',
 ]
 
-OBJECT_LIGHT_MAP = {  # name: (normalized_height, amount, color)
-    'ceiling_light': (0.8, 100, (1.0, 1.0, 0.9)),
-    'chandelier':    (0.8, 200, (1.0, 1.0, 0.8)),
-    'lamp':          (0.6, 100, (1.0, 1.0, 0.9)),
-
-    'chalice': (0.2, 30, (1.0, 1.0, 0.8)),
-    'cross':   (0.2, 30, (1.0, 1.0, 0.8)),
-    'crown':   (0.2, 30, (1.0, 1.0, 0.8)),
-    'jewels':  (0.2, 30, (1.0, 1.0, 0.8)),
-
-    'extra_life': (0.3, 30, (0.8, 0.8, 1.0)),
-    'gold_key':   (0.2, 30, (1.0, 1.0, 0.8)),
-    'medkit':     (0.2, 30, (1.0, 1.0, 1.0)),
-    'silver_key': (0.2, 30, (0.8, 1.0, 1.0)),
+COLLECTABLE_PICKUP_SOUNDS = {
+    'ammo':       'pickup__ammo',
+    'ammo_used':  'pickup__ammo',
+    'chaingun':   'pickup__chaingun',
+    'chalice':    'pickup__chalice',
+    'cross':      'pickup__cross',
+    'crown':      'pickup__crown',
+    'dog_food':   'pickup__medkit',
+    'extra_life': 'pickup__extra_life',
+    'food':       'pickup__food',
+    'gold_key':   'pickup__key',
+    'jewels':     'pickup__jewels',
+    'machinegun': 'pickup__machinegun',
+    'medkit':     'pickup__medkit',
+    'silver_key': 'pickup__key',
 }
 
 # TODO: add 'speed'
