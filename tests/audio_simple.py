@@ -69,7 +69,7 @@ class Test(unittest.TestCase):
 
             for i, sound in enumerate(music_manager):
                 path = './outputs/music_{}.wav'.format(i)
-                chunk_path = './outputs/music_{}.chunk'.format(i)
+                chunk_path = './outputs/music_{}.imf'.format(i)
                 logger.info('Music [%d/%d]: %r', (i + 1), count, path)
                 imf_chunk = sound.to_imf_chunk()
                 pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)
@@ -89,7 +89,8 @@ class Test(unittest.TestCase):
 
             for i, sound in enumerate(adlib_manager):
                 path = './outputs/adlib_{}.wav'.format(i)
-                chunk_path = './outputs/adlib_{}.chunk'.format(i)
+                chunk_path = './outputs/adlib_{}.imf'.format(i)
+                imf_path = './outputs/adlib_{}.imf'.format(i)
                 logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
                 imf_chunk = sound.to_imf_chunk()
                 pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)

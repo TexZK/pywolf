@@ -9,8 +9,6 @@ import subprocess
 import tempfile
 import wave
 
-import soundfile
-
 from .utils import (stream_read, stream_write,
                     stream_pack, stream_unpack, stream_unpack_array,
                     BinaryResource, ResourceManager)

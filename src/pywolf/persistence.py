@@ -92,6 +92,21 @@ class PrecachedChunksHandler(ChunksHandler):
     def clear(self):
         self._cache.clear()
 
+    def offsetof(self, index):
+        return self._wrapped.offsetof(index)
+
+    def sizeof(self, index):
+        return self._wrapped.sizeof(index)
+
+    def _seek(self, index, offsets=None):
+        pass
+
+    def load(self, *args, **kwargs):
+        self._wrapped.load(*args, **kwargs)
+
+    def extract_chunk(self, index):
+        return self._cache[index]
+
     def __len__(self):
         return len(self._wrapped)
 
@@ -102,7 +117,7 @@ class PrecachedChunksHandler(ChunksHandler):
         return item in self._cache
 
     def __iter__(self):
-        yield from self._chunks
+        yield from self._cache
 
     def assign(self, wrapped):
         if self._wrapped is not None:
@@ -112,9 +127,6 @@ class PrecachedChunksHandler(ChunksHandler):
     def cache_all(self):
         self.clear()
         self._cache.extend(self._wrapped)
-
-    def __getattr__(self, name):
-        return getattr(self._wrapped, name)
 
 
 class VSwapChunksHandler(ChunksHandler):
