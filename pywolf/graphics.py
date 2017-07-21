@@ -1,14 +1,13 @@
-'''
-@author: Andrea Zoppi
-'''
-
 import io
 import struct
 
 from PIL import Image
 
-from pywolf.utils import (stream_write, stream_pack, stream_unpack, stream_pack_array, stream_unpack_array,
-                          BinaryResource, ResourceManager)
+from .utils import (
+    stream_write, stream_pack, stream_unpack, 
+    stream_pack_array, stream_unpack_array,
+    BinaryResource, ResourceManager
+)
 
 
 ALPHA_INDEX = 0xFF
@@ -59,7 +58,7 @@ def sprite_expand(chunk, dimensions, alpha_index=0xFF):
     return bytes(expanded)
 
 
-def rgbpalette_flatten(palette_colors):
+def _rgbpalette_flatten(palette_colors):
     flat_palette = []
     for color in palette_colors:
         assert len(color) == 3
@@ -195,7 +194,8 @@ class Texture(object):
 
 class TextureManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None):
+    def __init__(self, chunks_handler, palette, dimensions, 
+                 start=None, count=None):
         super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._dimensions = dimensions
@@ -239,7 +239,8 @@ class Sprite(object):
 
 class SpriteManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, dimensions, start=None, count=None, alpha_index=ALPHA_INDEX):
+    def __init__(self, chunks_handler, palette, dimensions, 
+                 start=None, count=None, alpha_index=ALPHA_INDEX):
         super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._dimensions = dimensions

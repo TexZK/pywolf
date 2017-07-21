@@ -1,8 +1,10 @@
-'''
-@author: Andrea Zoppi
-'''
 
-from pywolf.graphics import rgbpalette_flatten
+def _rgbpalette_flatten(palette_colors):
+    flat_palette = []
+    for color in palette_colors:
+        assert len(color) == 3
+        flat_palette += color
+    return flat_palette
 
 
 GRAPHICS_PARTITIONS_MAP = {
@@ -302,7 +304,7 @@ GRAPHICS_PALETTE = [
 
 
 GRAPHICS_PALETTE_MAP = {
-    ...: rgbpalette_flatten(GRAPHICS_PALETTE)
+    ...: _rgbpalette_flatten(GRAPHICS_PALETTE)
 }
 
 TILE8_NAMES = [str(i) for i in range(GRAPHICS_PARTITIONS_MAP['tile8'][1])]  # TODO

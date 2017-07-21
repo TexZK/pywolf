@@ -1,9 +1,6 @@
 # TODO: create Exporter class(es)
 # TODO: break export loops into single item calls with wrapping loop
 # TODO: allow export to normal file, PK3 being an option (like with open(file_object|path))
-'''
-@author: Andrea Zoppi
-'''
 
 import argparse
 import collections
@@ -1465,9 +1462,6 @@ def export_tilemaps(params, cfg, zip_file, audio_chunks_handler):
             path = 'maps/{}.map'.format(name)
             zip_file.writestr(path, description)
             i += 1
-
-#             break  # XXX
-#         break  # XXX
 
     logger.info('Done')
     _sep()

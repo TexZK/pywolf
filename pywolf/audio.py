@@ -1,7 +1,3 @@
-'''
-@author: Andrea Zoppi
-'''
-
 import io
 import os
 import struct
@@ -9,9 +5,11 @@ import subprocess
 import tempfile
 import wave
 
-from .utils import (stream_read, stream_write,
-                    stream_pack, stream_unpack, stream_unpack_array,
-                    BinaryResource, ResourceManager)
+from .utils import (
+    stream_read, stream_write,
+    stream_pack, stream_unpack, stream_unpack_array,
+    BinaryResource, ResourceManager
+)
 
 
 ADLIB_CARRIERS = (3, 4, 5, 11, 12, 13, 19, 20, 21)

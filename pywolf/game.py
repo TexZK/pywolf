@@ -1,12 +1,10 @@
-'''
-@author: Andrea Zoppi
-'''
-
 import array
 import io
 
-from pywolf.utils import (stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
-                          BinaryResource, ResourceManager)
+from .utils import (
+    stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
+    BinaryResource, ResourceManager
+)
 
 
 VERTICAL   = 0

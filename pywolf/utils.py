@@ -1,7 +1,3 @@
-'''
-@author: Andrea Zoppi
-'''
-
 import array
 from importlib import import_module
 import importlib.util
