@@ -7,7 +7,7 @@ import os
 import sys
 import unittest
 
-import pywolf.utils
+import pywolf.compression
 
 
 def export(path, data):
@@ -51,20 +51,20 @@ class Test(unittest.TestCase):
         logger.info('len(data): %d', len(data))
         export(r'{}/huffman_data.bin'.format(self.OUTPUT_FOLDER), data)
 
-        counts = pywolf.utils.huffman_count(data)
+        counts = pywolf.compression.huffman_count(data)
         logger.info('counts: %r', counts)
-        nodes = pywolf.utils.huffman_build_nodes(counts)
+        nodes = pywolf.compression.huffman_build_nodes(counts)
         logger.info('nodes: %r', nodes)
-        shifts, masks = pywolf.utils.huffman_build_masks(counts, nodes)
+        shifts, masks = pywolf.compression.huffman_build_masks(counts, nodes)
         logger.info('shifts: %r', shifts)
         logger.info('masks: %r', masks)
 
-        compressed = pywolf.utils.huffman_compress(data, shifts, masks)
+        compressed = pywolf.compression.huffman_compress(data, shifts, masks)
         logger.info('len(compressed): %d', len(compressed))
         logger.info('ratio: %.2f%%', len(compressed) / len(data) * 100)
         export(r'{}/huffman_compressed.bin'.format(self.OUTPUT_FOLDER), compressed)
 
-        expanded = pywolf.utils.huffman_expand(compressed, len(data), nodes)
+        expanded = pywolf.compression.huffman_expand(compressed, len(data), nodes)
         logger.info('len(expanded): %d', len(expanded))
         export(r'{}/huffman_expanded.bin'.format(self.OUTPUT_FOLDER), expanded)
 
@@ -79,12 +79,12 @@ class Test(unittest.TestCase):
         export(r'{}/rlew_data.bin'.format(self.OUTPUT_FOLDER), data)
 
         tag = 0xFEFE
-        compressed = pywolf.utils.rlew_compress(data, tag)
+        compressed = pywolf.compression.rlew_compress(data, tag)
         logger.info('len(compressed): %d', len(compressed))
         logger.info('ratio: %.2f%%', len(compressed) / len(data) * 100)
         export(r'{}/rlew_compressed.bin'.format(self.OUTPUT_FOLDER), compressed)
 
-        expanded = pywolf.utils.rlew_expand(compressed, tag)
+        expanded = pywolf.compression.rlew_expand(compressed, tag)
         logger.info('len(expanded): %d', len(expanded))
         export(r'{}/rlew_expanded.bin'.format(self.OUTPUT_FOLDER), expanded)
 
@@ -94,16 +94,16 @@ class Test(unittest.TestCase):
         logger = logging.getLogger()
         logger.info('testCarmack')
 
-        data = self.data[:pywolf.utils.CARMACK_MAX_SIZE]
+        data = self.data[:pywolf.compression.CARMACK_MAX_SIZE]
         logger.info('len(data): %d', len(data))
         export(r'{}/carmack_data.bin'.format(self.OUTPUT_FOLDER), data)
 
-        compressed = pywolf.utils.carmack_compress(data)
+        compressed = pywolf.compression.carmack_compress(data)
         logger.info('len(compressed): %d', len(compressed))
         logger.info('ratio: %.2f%%', len(compressed) / len(data) * 100)
         export(r'{}/carmack_compressed.bin'.format(self.OUTPUT_FOLDER), compressed)
 
-        expanded = pywolf.utils.carmack_expand(compressed, len(data))
+        expanded = pywolf.compression.carmack_expand(compressed, len(data))
         logger.info('len(expanded): %d', len(expanded))
         export(r'{}/carmack_expanded.bin'.format(self.OUTPUT_FOLDER), expanded)
 
