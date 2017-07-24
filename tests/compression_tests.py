@@ -86,6 +86,26 @@ class Test(unittest.TestCase):
 
         self.assertEqual(expanded, data)
 
+    def testRLEB(self):
+        logger = logging.getLogger()
+        logger.info('testRLEB')
+
+        data = self.data
+        logger.info('len(data): %d', len(data))
+        export(r'{}/rleb_data.bin'.format(self.OUTPUT_FOLDER), data)
+
+        tag = 0xFE
+        compressed = pywolf.compression.rleb_compress(data, tag)
+        logger.info('len(compressed): %d', len(compressed))
+        logger.info('ratio: %.2f%%', len(compressed) / len(data) * 100)
+        export(r'{}/rleb_compressed.bin'.format(self.OUTPUT_FOLDER), compressed)
+
+        expanded = pywolf.compression.rleb_expand(compressed, tag)
+        logger.info('len(expanded): %d', len(expanded))
+        export(r'{}/rleb_expanded.bin'.format(self.OUTPUT_FOLDER), expanded)
+
+        self.assertEqual(expanded, data)
+
     def testCarmack(self):
         logger = logging.getLogger()
         logger.info('testCarmack')

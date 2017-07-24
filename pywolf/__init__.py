@@ -1,2 +1,2 @@
 __author__ = 'Andrea "TexZK" Zoppi'
-__all__ = ('audio', 'game', 'graphics', 'persistence', 'utils')
+__all__ = ('audio', 'compression', 'game', 'graphics', 'persistence', 'utils')

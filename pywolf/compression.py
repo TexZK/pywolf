@@ -178,7 +178,7 @@ def carmack_compress(data):
     ahead = len(source)
     index = 0
 
-    while True:
+    while ahead > 0:
         word = source[index]
         count = 0
         match = 0
@@ -222,10 +222,8 @@ def carmack_compress(data):
         index += count
         ahead -= count
 
-        if not ahead:
-            break
-        elif ahead < 0:
-            raise ValueError('ahead < 0')
+    if ahead < 0:
+        raise ValueError('ahead < 0')
 
     output = bytes(output)
     return output
@@ -236,6 +234,7 @@ def carmack_expand(data, expanded_size):
     assert expanded_size % 2 == 0
 
     output = bytearray()
+    append = output.append
     extend = output.extend
 
     it = iter(data)
@@ -253,48 +252,64 @@ def carmack_expand(data, expanded_size):
                 extend(output[offset:(offset + (count << 1))])
                 ahead -= count
             else:
-                extend([next(it), tag])
+                append(next(it))
+                append(tag)
                 ahead -= 1
         else:
-            extend([count, tag])
+            append(count)
+            append(tag)
             ahead -= 1
 
     output = bytes(output)
     return output
 
 
-RLEW_TAG = 0xABCD
-RLEW_NEAR_TAG = 0xA7
-RLEW_FAR_TAG = 0xA8
-
-
-def rlew_compress(data, tag):
-    output = array.array('H')
+def rle_compress(source, output, tag, max_count):
+    append = output.append
     extend = output.extend
 
-    it = iter(data)
     count = 0
     old = tag
-    while True:
-        try:
-            datum = next(it)
-        except StopIteration:
-            extend([old] * count)
-            break
-        try:
-            datum |= next(it) << 8
-        except StopIteration:
-            pass
-
-        if datum == old:
+    for datum in source:
+        if datum == old and count < max_count:
             count += 1
         else:
             if count > 3 or old == tag:
-                extend([tag, count, old])
+                append(tag)
+                append(count)
+                append(old)
             else:
-                extend([old] * count)
+                extend(old for _ in range(count))
             count = 1
             old = datum
+
+    extend(old for _ in range(count))
+
+
+def rle_expand(source, output, tag):
+    append = output.append
+    extend = output.extend
+
+    it = iter(source)
+    try:
+        while True:
+            datum = next(it)
+            if datum == tag:
+                count = next(it)
+                value = next(it)
+                extend(value for _ in range(count))
+            else:
+                append(datum)
+
+    except StopIteration:
+        pass
+
+
+def rlew_compress(data, tag):
+    source = array.array('H', data)
+    output = array.array('H')
+
+    rle_compress(source, output, tag, 0xFFFF)
 
     if sys.byteorder != 'little':
         output.byteswap()
@@ -303,24 +318,30 @@ def rlew_compress(data, tag):
 
 
 def rlew_expand(data, tag):
+    source = array.array('H', data)
     output = array.array('H')
-    append = output.append
-    extend = output.extend
 
-    it = iter(data)
-    while True:
-        try:
-            datum = next(it) | (next(it) << 8)
-        except StopIteration:
-            break
-        if datum == tag:
-            count = next(it) | (next(it) << 8)
-            value = next(it) | (next(it) << 8)
-            extend(value for _ in range(count))
-        else:
-            append(datum)
+    rle_expand(source, output, tag)
 
     if sys.byteorder != 'little':
         output.byteswap()
     output = output.tobytes()
+    return output
+
+
+def rleb_compress(data, tag):
+    output = bytearray()
+
+    rle_compress(data, output, tag, 0xFF)
+
+    output = bytes(output)
+    return output
+
+
+def rleb_expand(data, tag):
+    output = bytearray()
+
+    rle_expand(data, output, tag)
+
+    output = bytes(output)
     return output
