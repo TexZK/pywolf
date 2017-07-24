@@ -102,7 +102,7 @@ class TileMapManager(ResourceManager):
     def __init__(self, chunks_handler, start=None, count=None):
         super().__init__(chunks_handler, start, count)
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         header, raw_planes = chunk
         planes = [array.array('H', raw_plane) for raw_plane in raw_planes]
         return TileMap(header.size, planes, header.name)

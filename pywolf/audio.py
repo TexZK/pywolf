@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import wave
 
-from .utils import (
+from pywolf.utils import (
     stream_read, stream_write,
     stream_pack, stream_unpack, stream_unpack_array,
     BinaryResource, ResourceManager
@@ -246,7 +246,7 @@ class BuzzerSoundManager(ResourceManager):
     def __init__(self, chunks_handler, start=None, count=None):
         super().__init__(chunks_handler, start, count)
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return BuzzerSound(chunk)
 
 
@@ -417,7 +417,7 @@ class AdLibSoundManager(ResourceManager):
         super().__init__(chunks_handler, start, count)
         self.old_muse_compatibility = old_muse_compatibility
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return AdLibSound.from_bytes(chunk)
 
 
@@ -466,7 +466,7 @@ class MusicManager(ResourceManager):
     def __init__(self, chunks_handler, start=None, count=None):
         super().__init__(chunks_handler, start, count)
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return Music.from_bytes(chunk)
 
 
@@ -488,6 +488,6 @@ class SampledSoundManager(ResourceManager):
         super().__init__(chunks_handler, start, count)
         self.rate = rate
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         samples = bytes(samples_expand(self._chunks_handler, index))
         return SampledSound(self.rate, samples)

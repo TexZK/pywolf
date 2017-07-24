@@ -346,7 +346,7 @@ class PictureManager(ResourceManager):
         super().__init__(chunks_handler, start, count)
         self._palette_map = palette_map
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         chunks_handler = self._chunks_handler
         palette_map = self._palette_map
         start = self._start
@@ -365,10 +365,10 @@ class Tile8Manager(ResourceManager):
 
     def _get(self, index):
         chunk = self._chunks_handler[self._start]
-        item = self._build_resource(index, chunk)
+        item = self._load_resource(index, chunk)
         return item
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         palette_map = self._palette_map
         start = self._start
 
@@ -398,7 +398,7 @@ class TextureManager(ResourceManager):
         self._palette = palette
         self._size = size
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         palette = self._palette
         size = self._size
 
@@ -444,7 +444,7 @@ class SpriteManager(ResourceManager):
         self._size = size
         self._alpha_index = alpha_index
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         palette = self._palette
         size = self._size
         alpha_index = self._alpha_index
@@ -519,7 +519,7 @@ class FontManager(ResourceManager):
         self._palette = palette
         self._alpha_index = alpha_index
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         palette = self._palette
         alpha_index = self._alpha_index
 
@@ -568,11 +568,11 @@ class DOSScreenManager(ResourceManager):
         self._size = size
         self._font_size = font_size
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return DOSScreen(chunk, self._font, self._size, self._font_size)
 
 
 class TextArtManager(ResourceManager):
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return chunk.decode('ascii')

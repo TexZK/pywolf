@@ -521,10 +521,10 @@ class ResourceManager(object):
 
     def _get(self, index):
         chunk = self._chunks_handler[self._start + index]
-        item = self._build_resource(index, chunk)
+        item = self._load_resource(index, chunk)
         return item
 
-    def _build_resource(self, index, chunk):
+    def _load_resource(self, index, chunk):
         return chunk
 
 
