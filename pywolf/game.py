@@ -1,22 +1,22 @@
 import array
 import io
 
-from .utils import (
+from pywolf.utils import (
     stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
     BinaryResource, ResourceManager
 )
 
 
-VERTICAL   = 0
+VERTICAL = 0
 HORIZONTAL = 1
 
 
 class TileMapHeader(BinaryResource):
 
-    def __init__(self, plane_offsets, plane_sizes, dimensions, name):
+    def __init__(self, plane_offsets, plane_sizes, size, name):
         self.plane_offsets = plane_offsets
         self.plane_sizes = plane_sizes
-        self.dimensions = dimensions
+        self.size = size
         self.name = name
 
     @classmethod
@@ -25,18 +25,18 @@ class TileMapHeader(BinaryResource):
         assert planes_count > 0
         plane_offsets = tuple(stream_unpack_array('<L', stream, planes_count))
         plane_sizes = tuple(stream_unpack_array('<H', stream, planes_count))
-        dimensions = stream_unpack('<HH', stream)
+        size = stream_unpack('<HH', stream)
         name = stream_unpack('<16s', stream)[0].decode('ascii')
         null_char_index = name.find('\0')
         if null_char_index >= 0:
             name = name[:null_char_index]
         name = name.rstrip(' \t\r\n\v\0')
-        return cls(plane_offsets, plane_sizes, dimensions, name)
+        return cls(plane_offsets, plane_sizes, size, name)
 
     def to_stream(self, stream):
         stream_pack_array(stream, '<L', self.plane_offsets)
         stream_pack_array(stream, '<H', self.plane_sizes)
-        stream_pack(stream, '<HH', *self.dimensions)
+        stream_pack(stream, '<HH', *self.size)
         stream_pack(stream, '<16s', self.name.encode('ascii'))
 
     @classmethod
@@ -46,18 +46,18 @@ class TileMapHeader(BinaryResource):
 
 class TileMap(object):
 
-    def __init__(self, dimensions, planes, name):
-        width, height = dimensions
+    def __init__(self, size, planes, name):
+        width, height = size
         area = width * height
         assert all(len(plane) == area for plane in planes)
 
-        self.dimensions = dimensions
+        self.size = size
         self.name = name
         self.planes = planes
 
     def __getitem__(self, key):
         planes = self.planes
-        height = self.dimensions[1]
+        height = self.size[1]
         assert 2 <= len(key) <= 3
 
         tile_x, tile_y, *args = key
@@ -70,7 +70,7 @@ class TileMap(object):
 
     def __settitem__(self, key, value):
         planes = self.planes
-        height = self.dimensions[1]
+        height = self.size[1]
         assert 2 <= len(key) <= 3
 
         tile_x, tile_y, *args = key
@@ -84,7 +84,7 @@ class TileMap(object):
                 planes[i][tile_offset] = value[i]
 
     def get(self, key, default=None):
-        width, height = self.dimensions
+        width, height = self.size
         tile_x, tile_y, *_ = key
         tile_offset = tile_y * height + tile_x
         if 0 <= tile_offset < (width * height):
@@ -93,8 +93,8 @@ class TileMap(object):
             return default
 
     def check_coords(self, tile_coords):
-        return (0 <= tile_coords[0] < self.dimensions[0] and
-                0 <= tile_coords[1] < self.dimensions[1])
+        return (0 <= tile_coords[0] < self.size[0] and
+                0 <= tile_coords[1] < self.size[1])
 
 
 class TileMapManager(ResourceManager):
@@ -105,7 +105,7 @@ class TileMapManager(ResourceManager):
     def _build_resource(self, index, chunk):
         header, raw_planes = chunk
         planes = [array.array('H', raw_plane) for raw_plane in raw_planes]
-        return TileMap(header.dimensions, planes, header.name)
+        return TileMap(header.size, planes, header.name)
 
 
 class Game(object):  # TODO

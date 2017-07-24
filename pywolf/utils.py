@@ -97,6 +97,7 @@ def huffman_count(data):
 def huffman_trace(index, shift, mask, nodes, shifts, masks, counts):
     code0, code1 = nodes[index]
     shift += 1
+
     if shift < HUFFMAN_MAX_DEPTH:
         if code0 < HUFFMAN_NODE_COUNT:
             shifts[code0] = shift
@@ -112,6 +113,9 @@ def huffman_trace(index, shift, mask, nodes, shifts, masks, counts):
         else:
             huffman_trace(code1 - HUFFMAN_NODE_COUNT, shift, mask,
                           nodes, shifts, masks, counts)
+
+    elif counts[code0] < HUFFMAN_NODE_COUNT or counts[code1] < HUFFMAN_NODE_COUNT:
+        raise ValueError('Huffman mask too long')
 
 
 def huffman_build_nodes(counts, as_tuples=True):
@@ -170,6 +174,7 @@ def huffman_compress(data, shifts, masks):
 
     for datum in data:
         mask = masks[datum] << shift
+
         output[tail] |= mask & 0xFF
         mask >>= 8
         output[tail + 1] |= mask & 0xFF
@@ -177,11 +182,13 @@ def huffman_compress(data, shifts, masks):
         output[tail + 2] |= mask & 0xFF
         mask >>= 8
         output[tail + 3] |= mask & 0xFF
+
         shift += shifts[datum]
         tail += shift >> 3
         shift &= 7
 
-    del output[tail + (shift != 0):]
+    output = memoryview(output)
+    output = bytes(output[:tail + (shift != 0)])
     return output
 
 
@@ -217,10 +224,14 @@ def huffman_expand(data, expanded_size, nodes):
     except StopIteration:
         output += bytes(expanded_size - len(output))
 
-    return bytes(memoryview(output))
+    output = bytes(output)
+    return output
 
 
 def carmack_compress(data):
+    assert len(data) > 0
+    assert len(data) % 2 == 0
+
     source = array.array('H', data)
     if sys.byteorder != 'little':
         source.byteswap()
@@ -280,12 +291,13 @@ def carmack_compress(data):
         elif ahead < 0:
             raise ValueError('ahead < 0')
 
+    output = bytes(output)
     return output
 
 
 def carmack_expand(data, expanded_size):
     assert expanded_size > 0
-    assert expanded_size % struct.calcsize('<H') == 0
+    assert expanded_size % 2 == 0
 
     output = bytearray()
     extend = output.extend
@@ -311,7 +323,7 @@ def carmack_expand(data, expanded_size):
             extend([count, tag])
             ahead -= 1
 
-    output = bytes(memoryview(output))
+    output = bytes(output)
     return output
 
 

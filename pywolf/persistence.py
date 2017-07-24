@@ -1,12 +1,11 @@
 import io
 import logging
-import struct
 
-from .game import TileMapHeader
-from .utils import (
+from pywolf.game import TileMapHeader
+from pywolf.utils import (
     stream_fit, stream_read, stream_unpack, stream_unpack_array,
     sequence_index, sequence_getitem,
-    HUFFMAN_NODES_COUNT, huffman_expand, carmack_expand, rlew_expand
+    HUFFMAN_NODE_COUNT, huffman_expand, carmack_expand, rlew_expand
 )
 
 
@@ -117,7 +116,7 @@ class PrecachedChunksHandler(ChunksHandler):
         yield from self._cache
 
     def assign(self, wrapped):
-        if self._wrapped is not None:
+        if self._wrapped is not None and self._wrapped is not wrapped:
             raise ValueError('already wrapped')
         self._wrapped = wrapped
 
@@ -135,13 +134,13 @@ class VSwapChunksHandler(ChunksHandler):
         self.sprites_start = None
         self.sounds_start = None
 
-    def load(self, data_stream, data_base=None, data_size=None, dimensions=(64, 64), alpha_index=0xFF,
+    def load(self, data_stream, data_base=None, data_size=None, image_size=(64, 64), alpha_index=0xFF,
              data_size_guard=None):
         super().load(data_stream, data_base, data_size)
         data_stream = self._data_stream
         data_base = self._data_base
         data_size = self._data_size
-        assert data_size % struct.calcsize('<LH') == 0
+        assert data_size % 6 == 0
         alpha_index = int(alpha_index)
         assert 0x00 <= alpha_index <= 0xFF
 
@@ -151,7 +150,7 @@ class VSwapChunksHandler(ChunksHandler):
 
         pages_offset = chunk_offsets[0]
         pages_size = data_size - pages_offset
-        assert data_size_guard is None or data_size < data_size_guard  # 100 MiB
+        assert data_size_guard is None or data_size < data_size_guard
         for i in reversed(range(chunk_count)):
             if not chunk_offsets[i]:
                 chunk_offsets[i] = chunk_offsets[i + 1]
@@ -162,7 +161,7 @@ class VSwapChunksHandler(ChunksHandler):
         self._chunk_offsets = chunk_offsets
         self._pages_offset = pages_offset
         self._pages_size = pages_size
-        self._dimensions = dimensions
+        self._image_size = image_size
         self._alpha_index = alpha_index
         self.sprites_start = sprites_start
         self.sounds_start = sounds_start
@@ -186,8 +185,8 @@ class VSwapChunksHandler(ChunksHandler):
         chunk_count = self._chunk_count
         sounds_start = self.sounds_start
 
-        assert self.sizeof(chunk_count - 1) % struct.calcsize('<HH') == 0
-        count = self.sizeof(chunk_count - 1) // struct.calcsize('<HH')
+        assert self.sizeof(chunk_count - 1) % 4 == 0
+        count = self.sizeof(chunk_count - 1) // 4
         self._seek(chunk_count - 1)
         bounds = list(stream_unpack_array('<HH', data_stream, count, scalar=False))
         bounds.append([(chunk_count - sounds_start), bounds[-1][1]])
@@ -229,9 +228,9 @@ class AudioChunksHandler(ChunksHandler):
         super().load(data_stream, data_base, data_size)
         data_size = self._data_size
         header_base, header_size = stream_fit(header_stream, header_base, header_size)
-        assert header_size % struct.calcsize('<L') == 0
+        assert header_size % 4 == 0
 
-        chunk_count = header_size // struct.calcsize('<L')
+        chunk_count = header_size // 4
         chunk_offsets = list(stream_unpack_array('<L', header_stream, chunk_count))
         chunk_offsets.append(data_size)
         assert all(0 <= chunk_offsets[i] <= data_size for i in range(chunk_count))
@@ -265,9 +264,9 @@ class GraphicsChunksHandler(ChunksHandler):
         self._huffman_offset = None
         self._huffman_size = None
         self._partition_map = {}
-        self._pics_dimensions_index = None
+        self._pics_size_index = None
         self._huffman_nodes = ()
-        self.pics_dimensions = ()
+        self.pics_size = ()
 
     def _seek(self, index, offsets=None):
         data_stream = self._data_stream
@@ -275,21 +274,21 @@ class GraphicsChunksHandler(ChunksHandler):
         data_stream.seek(data_base + self.offsetof(index))
 
     def load(self, data_stream, header_stream, huffman_stream,
-             partition_map, pics_dimensions_index=0,
+             partition_map, pics_size_index=0,
              data_base=None, data_size=None,
              header_base=None, header_size=None,
              huffman_offset=None, huffman_size=None):
 
         super().load(data_stream, data_base, data_size)
         data_size = self._data_size
-        pics_dimensions_index = int(pics_dimensions_index)
-        assert pics_dimensions_index >= 0
+        pics_size_index = int(pics_size_index)
+        assert pics_size_index >= 0
         header_base, header_size = stream_fit(header_stream, header_base, header_size)
         huffman_offset, huffman_size = stream_fit(huffman_stream, huffman_offset, huffman_size)
-        assert header_size % struct.calcsize('<BBB') == 0
-        assert huffman_size >= struct.calcsize('<HH') * HUFFMAN_NODES_COUNT
+        assert header_size % 3 == 0
+        assert huffman_size >= 4 * HUFFMAN_NODE_COUNT
 
-        chunk_count = header_size // struct.calcsize('<BBB')
+        chunk_count = header_size // 3
         chunk_offsets = [None] * chunk_count
         for i in range(chunk_count):
             byte0, byte1, byte2 = stream_unpack('<BBB', header_stream)
@@ -303,7 +302,7 @@ class GraphicsChunksHandler(ChunksHandler):
         assert all(0 <= chunk_offsets[i] <= data_size for i in range(chunk_count))
         assert all(chunk_offsets[i] <= chunk_offsets[i + 1] for i in range(chunk_count))
 
-        huffman_nodes = list(stream_unpack_array('<HH', huffman_stream, HUFFMAN_NODES_COUNT, scalar=False))
+        huffman_nodes = list(stream_unpack_array('<HH', huffman_stream, HUFFMAN_NODE_COUNT, scalar=False))
         self._chunk_count = chunk_count
         self._chunk_offsets = chunk_offsets
         self._header_stream = header_stream
@@ -313,9 +312,9 @@ class GraphicsChunksHandler(ChunksHandler):
         self._huffman_offset = huffman_offset
         self._huffman_size = huffman_size
         self._partition_map = partition_map
-        self._pics_dimensions_index = pics_dimensions_index
+        self._pics_size_index = pics_size_index
         self._huffman_nodes = huffman_nodes
-        self.pics_dimensions = self._build_pics_dimensions()
+        self.pics_size = self._build_pics_size()
         return self
 
     def extract_chunk(self, index):
@@ -339,8 +338,8 @@ class GraphicsChunksHandler(ChunksHandler):
         data_stream = self._data_stream
         partition_map = self._partition_map
 
-        BLOCK_SIZE = 8 * 8 * struct.calcsize('<B')
-        MASKBLOCK_SIZE = 8 * 8 * struct.calcsize('<H')
+        BLOCK_SIZE = (8 * 8) * 1
+        MASKBLOCK_SIZE = (8 * 8) * 2
         compressed_size = self.sizeof(index)
         key, *value = self.find_partition(partition_map, index)
 
@@ -358,21 +357,21 @@ class GraphicsChunksHandler(ChunksHandler):
             expanded_size = MASKBLOCK_SIZE * 16
         else:  # everything else has an explicit size longword
             expanded_size = stream_unpack('<L', data_stream)[0]
-            compressed_size -= struct.calcsize('<L')
+            compressed_size -= 4
 
         logger.debug(('%r._read_sizes(index=%d), partition_map[%r]=%r, compressed_size=0x%X, expanded_size=0x%X'),
                      self, index, key, value, compressed_size, expanded_size)
 
         return compressed_size, expanded_size
 
-    def _build_pics_dimensions(self):
+    def _build_pics_size(self):
         partition_map = self._partition_map
-        pics_dimensions_index = self._pics_dimensions_index
+        pics_size_index = self._pics_size_index
 
         count = partition_map['pics'][1]
-        chunk = self.extract_chunk(pics_dimensions_index)
-        pics_dimensions = list(stream_unpack_array('<HH', io.BytesIO(chunk), count, scalar=False))
-        return pics_dimensions
+        chunk = self.extract_chunk(pics_size_index)
+        pics_size = list(stream_unpack_array('<HH', io.BytesIO(chunk), count, scalar=False))
+        return pics_size
 
     @classmethod
     def find_partition(cls, partition_map, index):
@@ -385,7 +384,7 @@ class GraphicsChunksHandler(ChunksHandler):
         raise KeyError(index)
 
 
-class MapChunksHandler(ChunksHandler):  # TODO
+class MapChunksHandler(ChunksHandler):
 
     def clear(self):
         super().clear()
@@ -410,8 +409,8 @@ class MapChunksHandler(ChunksHandler):  # TODO
 
         rlew_tag = stream_unpack('<H', header_stream)[0]
 
-        assert (header_size - struct.calcsize('<H')) % struct.calcsize('<L') == 0
-        chunk_count = (header_size - struct.calcsize('<H')) // struct.calcsize('<L')
+        assert (header_size - 2) % 4 == 0
+        chunk_count = (header_size - 2) // 4
         chunk_offsets = [None] * chunk_count
         for i in range(chunk_count):
             offset = stream_unpack('<L', header_stream)[0]
@@ -451,9 +450,9 @@ class MapChunksHandler(ChunksHandler):  # TODO
             for i in range(planes_count):
                 self._seek(i, header.plane_offsets)
                 expanded_size = stream_unpack('<H', data_stream)[0]
-                compressed_size = header.plane_sizes[i] - struct.calcsize('<H')
+                compressed_size = header.plane_sizes[i] - 2
                 chunk = stream_read(data_stream, compressed_size)
                 if carmacized:
-                    chunk = carmack_expand(chunk, expanded_size)[struct.calcsize('<H'):]
+                    chunk = carmack_expand(chunk, expanded_size)[2:]
                 planes[i] = rlew_expand(chunk, rlew_tag)
         return (header, planes)

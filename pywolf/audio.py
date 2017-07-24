@@ -292,7 +292,7 @@ class AdLibSoundHeader(BinaryResource):
     @classmethod
     def from_bytes(cls, data, offset=0):
         args = struct.unpack_from('<LH13B', data, offset)
-        offset += struct.calcsize('<LH13B3s')
+        offset += cls.SIZE - 1
         args += stream_unpack('<B', data, offset)
         return cls(*args)
 
@@ -343,7 +343,7 @@ class AdLibSoundHeader(BinaryResource):
 
         if length is None:
             length = self.length
-        length = (len(setup_events) + length) * struct.calcsize('<BBH')
+        length = (len(setup_events) + length) * 4
         setup_events_data = [struct.pack('<BBH', *event) for event in setup_events]
         return b''.join([struct.pack('<H', length)] + setup_events_data)
 
@@ -436,15 +436,15 @@ class Music(BinaryResource):
         return self.events[key]
 
     def to_imf_chunk(self):
-        length = len(self.events) * struct.calcsize('<BBH')
+        length = len(self.events) * 4
         events_data = [struct.pack('<BBH', *event) for event in self.events]
         return b''.join([struct.pack('<H', length)] + events_data)
 
     @classmethod
     def from_stream(cls, stream):
         length = stream_unpack('<H', stream)[0]
-        assert length % struct.calcsize('<BBH') == 0
-        length //= struct.calcsize('<BBH')
+        assert length % 4 == 0
+        length //= 4
         events = list(stream_unpack_array('<BBH', stream, length, scalar=False))
         return cls(events)
 
