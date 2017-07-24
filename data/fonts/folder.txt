@@ -1,0 +1,2 @@
+Put font files here.
+By default, tests use "Px437_IBM_VGA9.ttf" from http://int10h.org/
