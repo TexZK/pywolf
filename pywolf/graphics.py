@@ -1,7 +1,7 @@
 import collections
 import struct
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from pywolf.utils import (
     stream_write, stream_pack, stream_unpack,
     stream_pack_array, stream_unpack_array,

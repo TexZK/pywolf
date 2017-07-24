@@ -1,4 +1,3 @@
-
 import array
 import sys
 
@@ -265,8 +264,8 @@ def carmack_expand(data, expanded_size):
 
 
 RLEW_TAG = 0xABCD
-RLEW_FAR_TAG = 0xA8
 RLEW_NEAR_TAG = 0xA7
+RLEW_FAR_TAG = 0xA8
 
 
 def rlew_compress(data, tag):

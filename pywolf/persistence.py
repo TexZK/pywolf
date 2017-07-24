@@ -1,11 +1,11 @@
 import io
 import logging
 
+from pywolf.compression import HUFFMAN_NODE_COUNT, huffman_expand, carmack_expand, rlew_expand
 from pywolf.game import TileMapHeader
 from pywolf.utils import (
     stream_fit, stream_read, stream_unpack, stream_unpack_array,
-    sequence_index, sequence_getitem,
-    HUFFMAN_NODE_COUNT, huffman_expand, carmack_expand, rlew_expand
+    sequence_index, sequence_getitem
 )
 
 

@@ -1,7 +1,3 @@
-'''
-@author: Andrea Zoppi
-'''
-
 import logging
 import os
 import sys

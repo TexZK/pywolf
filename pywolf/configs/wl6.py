@@ -1,4 +1,3 @@
-
 def _rgbpalette_flatten(palette_colors):
     flat_palette = []
     for color in palette_colors:
