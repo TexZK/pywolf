@@ -46,9 +46,11 @@ CP437_CHARS = (
     '\u00B0', '\u2219', '\u00B7', '\u221A', '\u207F', '\u00B2', '\u25A0', '\u00A0',
 )
 
+CP437_MAP = {c: i for i, c in enumerate(CP437_CHARS)}
+
 
 def unicode_to_cp437(unicode_text):
-    cp437_bytes = bytes(CP437_CHARS.index(c) for c in unicode_text)
+    cp437_bytes = bytes(CP437_MAP[c] for c in unicode_text)
     return cp437_bytes
 
 
