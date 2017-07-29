@@ -65,8 +65,8 @@ class Test(unittest.TestCase):
                                                               start=start, count=count)
 
             for i, sound in enumerate(sample_manager):
-                path = r'{}/sample_{}.wav'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
+                path = r'{}/sample_{:04d}.wav'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Sampled sound [%4d/%4d]: %r', (i + 1), count, path)
                 sound.wave_write(path)
 
     def testMusics(self):
@@ -83,9 +83,9 @@ class Test(unittest.TestCase):
             music_manager = pywolf.audio.MusicManager(audio_chunks_handler, start, count)
 
             for i, sound in enumerate(music_manager):
-                path = '{}/music_{}.wav'.format(self.OUTPUT_FOLDER, i)
-                chunk_path = '{}/music_{}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
-                logger.info('Music [%d/%d]: %r', (i + 1), count, path)
+                path = '{}/music_{:04d}.wav'.format(self.OUTPUT_FOLDER, i)
+                chunk_path = '{}/music_{:04d}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
+                logger.info('Music [%4d/%4d]: %r', (i + 1), count, path)
                 imf_chunk = sound.to_imf_chunk()
                 pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)
 
@@ -103,10 +103,10 @@ class Test(unittest.TestCase):
             adlib_manager = pywolf.audio.AdLibSoundManager(audio_chunks_handler, start, count)
 
             for i, sound in enumerate(adlib_manager):
-                path = '{}/adlib_{}.wav'.format(self.OUTPUT_FOLDER, i)
-                chunk_path = '{}/adlib_{}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
-                imf_path = '{}/adlib_{}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
-                logger.info('AdLib sound [%d/%d]: %r', (i + 1), count, path)
+                path = '{}/adlib_{:04d}.wav'.format(self.OUTPUT_FOLDER, i)
+                chunk_path = '{}/adlib_{:04d}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
+                imf_path = '{}/adlib_{:04d}.{}'.format(self.OUTPUT_FOLDER, i, self.OUTPUT_IMF_EXT)
+                logger.info('AdLib sound [%4d/%4d]: %r', (i + 1), count, path)
                 imf_chunk = sound.to_imf_chunk()
                 pywolf.audio.convert_imf_to_wave(imf_chunk, IMF2WAV_PATH, wave_path=path, chunk_path=chunk_path)
 
@@ -125,8 +125,8 @@ class Test(unittest.TestCase):
             buzzer_manager = pywolf.audio.BuzzerSoundManager(audio_chunks_handler, start=start, count=count)
 
             for i, sound in enumerate(buzzer_manager):
-                path = r'{}/buzzer_{}.wav'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Buzzer sound [%d/%d]: %r', (i + 1), count, path)
+                path = r'{}/buzzer_{:04d}.wav'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Buzzer sound [%4d/%4d]: %r', (i + 1), count, path)
                 sound.wave_write(path)
 
 

@@ -53,8 +53,8 @@ class Test(unittest.TestCase):
 
         count = len(vswap_chunks_handler)
         for i, chunk in enumerate(vswap_chunks_handler):
-            path = r'{}/vswap_{}.bin'.format(self.OUTPUT_FOLDER, i)
-            logger.info('VSwap chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            path = r'{}/vswap_{:04d}.bin'.format(self.OUTPUT_FOLDER, i)
+            logger.info('VSwap chunk [%4d/%4d]: %r, 0x%04X bytes', (i + 1), count, path, len(chunk))
             with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
@@ -70,8 +70,8 @@ class Test(unittest.TestCase):
 
         count = len(audio_chunks_handler)
         for i, chunk in enumerate(audio_chunks_handler):
-            path = r'{}/audio_{}.bin'.format(self.OUTPUT_FOLDER, i)
-            logger.info('Audio chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            path = r'{}/audio_{:04d}.bin'.format(self.OUTPUT_FOLDER, i)
+            logger.info('Audio chunk [%4d/%4d]: %r, 0x%04X bytes', (i + 1), count, path, len(chunk))
             with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
@@ -89,8 +89,8 @@ class Test(unittest.TestCase):
 
         count = len(graphics_chunks_handler)
         for i, chunk in enumerate(graphics_chunks_handler):
-            path = r'{}/graphics_{}.bin'.format(self.OUTPUT_FOLDER, i)
-            logger.info('Graphics chunk [%d/%d]: %r, 0x%X bytes', (i + 1), count, path, len(chunk))
+            path = r'{}/graphics_{:04d}.bin'.format(self.OUTPUT_FOLDER, i)
+            logger.info('Graphics chunk [%4d/%4d]: %r, 0x%04X bytes', (i + 1), count, path, len(chunk))
             with open(path, 'wb') as chunk_file:
                 chunk_file.write(chunk)
 
@@ -107,17 +107,17 @@ class Test(unittest.TestCase):
         count = len(tilemap_chunks_handler)
         for i, item in enumerate(tilemap_chunks_handler):
             header, planes = item
-            logger.info('TileMap chunk [%d/%d]:', (i + 1), count)
+            logger.info('TileMap chunk [%4d/%4d]:', (i + 1), count)
             if header is not None:
                 header_bytes = header.to_bytes()
-                path = r'{}/tilemap_{}_header.bin'.format(self.OUTPUT_FOLDER, i)
-                logger.info('... header: %r, 0x%X', path, len(header_bytes))
+                path = r'{}/tilemap_{:04d}_header.bin'.format(self.OUTPUT_FOLDER, i)
+                logger.info('... header: %r, 0x%04X bytes', path, len(header_bytes))
                 with open(path, 'wb') as header_file:
                     header_file.write(header_bytes)
 
                 for j, plane in enumerate(planes):
-                    path = r'{}/tilemap_{}_plane{}.bin'.format(self.OUTPUT_FOLDER, i, j)
-                    logger.info('... plane [%d/%d]: %r, 0x%X bytes', (j + 1), len(planes), path, len(plane))
+                    path = r'{}/tilemap_{:04d}_plane{}.bin'.format(self.OUTPUT_FOLDER, i, j)
+                    logger.info('... plane [%d/%d]: %r, 0x%04X bytes', (j + 1), len(planes), path, len(plane))
                     with open(path, 'wb') as chunk_file:
                         chunk_file.write(plane)
 

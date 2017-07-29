@@ -77,8 +77,8 @@ class Test(unittest.TestCase):
             texture_manager = pywolf.graphics.TextureManager(vswap_chunks_handler, palette, (64, 64), start, count)
 
             for i, texture in enumerate(texture_manager):
-                path = r'{}/texture_{}.png'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Texture [%d/%d]: %r, %r', (i + 1), count, texture.size, path)
+                path = r'{}/texture_{:04d}.png'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Texture [%4d/%4d]: %r, %r', (i + 1), count, texture.size, path)
                 texture.image.save(path)
 
     def testSprites(self):
@@ -96,8 +96,8 @@ class Test(unittest.TestCase):
             sprite_manager = pywolf.graphics.SpriteManager(vswap_chunks_handler, palette, (64, 64), start, count)
 
             for i, sprite in enumerate(sprite_manager):
-                path = r'{}/sprite_{}.png'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Sprite [%d/%d]: %r, %r', (i + 1), count, sprite.size, path)
+                path = r'{}/sprite_{:04d}.png'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Sprite [%4d/%4d]: %r, %r', (i + 1), count, sprite.size, path)
                 sprite.image.save(path)
 
     def testPictures(self):
@@ -116,8 +116,8 @@ class Test(unittest.TestCase):
             picture_manager = pywolf.graphics.PictureManager(graphics_chunks_handler, palette_map, start, count)
 
             for i, picture in enumerate(picture_manager):
-                path = r'{}/picture_{}.png'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Picture [%d/%d]: %r, %r', (i + 1), count, picture.size, path)
+                path = r'{}/picture_{:04d}.png'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Picture [%4d/%4d]: %r, %r', (i + 1), count, picture.size, path)
                 picture.image.save(path)
 
     def testTile8(self):
@@ -136,8 +136,8 @@ class Test(unittest.TestCase):
             tile8_manager = pywolf.graphics.Tile8Manager(graphics_chunks_handler, palette_map, start, count)
 
             for i, tile8 in enumerate(tile8_manager):
-                path = r'{}/tile8_{}.png'.format(self.OUTPUT_FOLDER, i)
-                logger.info('Tile8 [%d/%d]: %r', (i + 1), count, path)
+                path = r'{}/tile8_{:04d}.png'.format(self.OUTPUT_FOLDER, i)
+                logger.info('Tile8 [%4d/%4d]: %r', (i + 1), count, path)
                 tile8.image.save(path)
 
     def testFonts(self):
@@ -158,9 +158,9 @@ class Test(unittest.TestCase):
             for i, font in enumerate(font_manager):
                 for j, image in enumerate(font.images):
                     if image is not None:
-                        path = r'{}/font_{}_{}.png'.format(self.OUTPUT_FOLDER, i, j)
+                        path = r'{}/font_{:04d}_{}.png'.format(self.OUTPUT_FOLDER, i, j)
                         size = (font.widths[j], font.height)
-                        logger.info('Font glyph [%d/%d][%d/%d]: %r %r',
+                        logger.info('Font glyph [%4d/%4d][%4d/%4d]: %r %r',
                                     (i + 1), count, (j + 1), len(font.images), size, path)
                         image.save(path)
 
@@ -181,9 +181,9 @@ class Test(unittest.TestCase):
             screen_manager = pywolf.graphics.DOSScreenManager(graphics_chunks_handler, font, start, count)
 
             for i, screen in enumerate(screen_manager):
-                path = r'{}/screen_{}.gif'.format(self.OUTPUT_FOLDER, i)
+                path = r'{}/screen_{:04d}.gif'.format(self.OUTPUT_FOLDER, i)
                 frames = screen.frames
-                logger.info('DOS Screen [%d/%d]: %r (%d frames)', (i + 1), count, path, len(frames))
+                logger.info('DOS Screen [%4d/%4d]: %r (%d frames)', (i + 1), count, path, len(frames))
                 if len(frames) > 1:
                     frames[0].save(path, save_all=True, append_images=frames[1:], duration=1000, loop=0)
                 else:
@@ -205,8 +205,8 @@ class Test(unittest.TestCase):
             helpart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
             for i, helpart in enumerate(helpart_manager):
-                path = r'{}/helpart_{}.txt'.format(self.OUTPUT_FOLDER, i)
-                logger.info('HelpArt [%d/%d]: %r, %d chars', (i + 1), count, path, len(helpart))
+                path = r'{}/helpart_{:04d}.txt'.format(self.OUTPUT_FOLDER, i)
+                logger.info('HelpArt [%4d/%4d]: %r, %d chars', (i + 1), count, path, len(helpart))
                 with open(path, 'wt') as helpart_file:
                     helpart_file.write(helpart)
 
@@ -226,8 +226,8 @@ class Test(unittest.TestCase):
             endart_manager = pywolf.graphics.TextArtManager(graphics_chunks_handler, start, count)
 
             for i, endart in enumerate(endart_manager):
-                path = r'{}/endart_{}.txt'.format(self.OUTPUT_FOLDER, i)
-                logger.info('EndArt [%d/%d]: %r, %d chars', (i + 1), count, path, len(endart))
+                path = r'{}/endart_{:04d}.txt'.format(self.OUTPUT_FOLDER, i)
+                logger.info('EndArt [%4d/%4d]: %r, %d chars', (i + 1), count, path, len(endart))
                 with open(path, 'wt') as endart_file:
                     endart_file.write(endart)
 
