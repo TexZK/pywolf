@@ -292,20 +292,20 @@ ANSI_PALETTE = (
 
 
 def render_ansi_line(ansi_image, cursor, font, text, attrs, special=None, font_size=None):
-    draw = ImageDraw.Draw(ansi_image)
     if font_size is None:
-        font_width, font_height = (9, 16)  # TODO: retrieve from font
-    else:
-        font_width, font_height = font_size
+        font_size = font.getsize('\u2588')  # full block
+    font_width, font_height = font_size
     image_width, image_height = ansi_image.size
     text_width = image_width // font_width
     text_height = image_height // font_height
     cursor_x, cursor_y = cursor
     left = cursor[0] * font_width
     top = cursor[1] * font_height
+    bg_mask = 0x0F if special is 'fullcolor' else 0x07
+    draw = ImageDraw.Draw(ansi_image)
 
     for char, attr in zip(text, attrs):
-        bg = (attr >> 4) & (0x0F if special is 'fullcolor' else 0x07)
+        bg = (attr >> 4) & bg_mask
 
         box = (left, top, left + font_width - 1, top + font_height - 1)
         draw.rectangle(box, fill=bg)
@@ -544,17 +544,19 @@ class DOSScreen(object):
         self.chars = bytes(data[i] for i in range(9 + 0, len(data), 2))
         self.attrs = bytes(data[i] for i in range(9 + 1, len(data), 2))
 
-        image0 = create_ansi_image(text_size, font_size)
+        if font_size is None:
+            font_size = font.getsize('\u2588')  # full block
+        frame0 = create_ansi_image(text_size, font_size)
         text = cp437_to_unicode(self.chars)
-        render_ansi_line(image0, (0, 0), font, text, self.attrs, font_size=font_size)
+        render_ansi_line(frame0, (0, 0), font, text, self.attrs, font_size=font_size)
 
         if any(attr & 0x80 for attr in self.attrs):
-            image1 = create_ansi_image(text_size, font_size)
+            frame1 = create_ansi_image(text_size, font_size)
             text = cp437_to_unicode(self.chars)
-            render_ansi_line(image1, (0, 0), font, text, self.attrs, font_size=font_size, special='hide')
-            self.images = [image0, image1]
+            render_ansi_line(frame1, (0, 0), font, text, self.attrs, font_size=font_size, special='hide')
+            self.frames = [frame0, frame1]
         else:
-            self.images = [image0]
+            self.frames = [frame0]
 
     def __len__(self):
         return len(self.chars)
@@ -562,7 +564,7 @@ class DOSScreen(object):
 
 class DOSScreenManager(ResourceManager):
 
-    def __init__(self, chunks_handler, font, start=None, count=None, size=(80, 25), font_size=(9, 16)):
+    def __init__(self, chunks_handler, font, start=None, count=None, size=(80, 25), font_size=None):
         super().__init__(chunks_handler, start, count)
         self._font = font
         self._size = size

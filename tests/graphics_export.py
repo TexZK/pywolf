@@ -182,12 +182,12 @@ class Test(unittest.TestCase):
 
             for i, screen in enumerate(screen_manager):
                 path = r'{}/screen_{}.gif'.format(self.OUTPUT_FOLDER, i)
-                images = screen.images
-                logger.info('DOS Screen [%d/%d]: %r (%d frames)', (i + 1), count, path, len(images))
-                if len(images) > 1:
-                    images[0].save(path, save_all=True, append_images=images[1:], duration=1000, loop=0)
+                frames = screen.frames
+                logger.info('DOS Screen [%d/%d]: %r (%d frames)', (i + 1), count, path, len(frames))
+                if len(frames) > 1:
+                    frames[0].save(path, save_all=True, append_images=frames[1:], duration=1000, loop=0)
                 else:
-                    images[0].save(path)
+                    frames[0].save(path)
 
     def testHelpArts(self):
         logger = logging.getLogger()
