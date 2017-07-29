@@ -1,12 +1,8 @@
 import io
-import logging
 
 from pywolf.compression import HUFFMAN_NODE_COUNT, huffman_expand, carmack_expand, rlew_expand
 from pywolf.game import TileMapHeader
-from pywolf.utils import (
-    stream_fit, stream_read, stream_unpack, stream_unpack_array,
-    sequence_index, sequence_getitem
-)
+from pywolf.utils import stream_fit, stream_read, stream_unpack, stream_unpack_array, sequence_index, sequence_getitem
 
 
 class ChunksHandler(object):
@@ -22,11 +18,11 @@ class ChunksHandler(object):
         self._chunk_offsets = ()
 
     def offsetof(self, index):
-        return self._chunk_offsets[sequence_index(index, self._chunk_count)]
+        return self._chunk_offsets[sequence_index(index, len(self))]
 
     def sizeof(self, index):
         chunk_offsets = self._chunk_offsets
-        index = sequence_index(index, self._chunk_count)
+        index = sequence_index(index, len(self))
         return chunk_offsets[index + 1] - chunk_offsets[index]
 
     def _seek(self, index, offsets=None):
@@ -41,25 +37,14 @@ class ChunksHandler(object):
         data_stream.seek(data_base + offset)
 
     def load(self, data_stream, data_base=None, data_size=None):
-        logger = logging.getLogger()
         self.clear()
-
         data_base, data_size = stream_fit(data_stream, data_base, data_size)
-        logger.info('%r.load(data_stream=%r, data_base=0x%X, data_size=0x%X)',
-                    self, data_stream, data_base, data_size)
-
         self._data_stream = data_stream
         self._data_base = data_base
         self._data_size = data_size
-        return self
 
     def extract_chunk(self, index):
         raise NotImplementedError
-
-    def _log_extract_chunk(self, index):
-        logger = logging.getLogger()
-        logger.debug('%r.extract_chunk(index=%d), chunk_offset=0x%X, chunk_size=0x%X',
-                     self, index, self.offsetof(index), self.sizeof(index))
 
     def __len__(self):
         return self._chunk_count
@@ -169,7 +154,6 @@ class VSwapChunksHandler(ChunksHandler):
         return self
 
     def extract_chunk(self, index):
-        self._log_extract_chunk(index)
         data_stream = self._data_stream
 
         chunk_size = self.sizeof(index)
@@ -204,7 +188,7 @@ class VSwapChunksHandler(ChunksHandler):
                 last += sounds_start
 
             actual_length = sum(self.sizeof(j) for j in range(sounds_start + start, last))
-            if actual_length & 0xFFFF0000 and (actual_length & 0xFFFF) < length:  # FIXME: really needed?
+            if actual_length & 0xFFFF0000 and (actual_length & 0xFFFF) < length:  # TBV: really needed?
                 actual_length -= 0x10000
             actual_length = (actual_length & 0xFFFF0000) | length
 
@@ -244,7 +228,6 @@ class AudioChunksHandler(ChunksHandler):
         return self
 
     def extract_chunk(self, index):
-        self._log_extract_chunk(index)
         data_stream = self._data_stream
 
         chunk_size = self.sizeof(index)
@@ -318,7 +301,6 @@ class GraphicsChunksHandler(ChunksHandler):
         return self
 
     def extract_chunk(self, index):
-        self._log_extract_chunk(index)
         chunk_count = self._chunk_count
         data_stream = self._data_stream
         huffman_nodes = self._huffman_nodes
@@ -334,14 +316,13 @@ class GraphicsChunksHandler(ChunksHandler):
         return chunk
 
     def _read_sizes(self, index):
-        logger = logging.getLogger()
         data_stream = self._data_stream
         partition_map = self._partition_map
 
         BLOCK_SIZE = (8 * 8) * 1
         MASKBLOCK_SIZE = (8 * 8) * 2
         compressed_size = self.sizeof(index)
-        key, *value = self.find_partition(partition_map, index)
+        key = self.find_partition(partition_map, index)[0]
 
         if key == 'tile8':  # tile 8s are all in one chunk!
             expanded_size = BLOCK_SIZE * partition_map[key][1]
@@ -358,9 +339,6 @@ class GraphicsChunksHandler(ChunksHandler):
         else:  # everything else has an explicit size longword
             expanded_size = stream_unpack('<L', data_stream)[0]
             compressed_size -= 4
-
-        logger.debug(('%r._read_sizes(index=%d), partition_map[%r]=%r, compressed_size=0x%X, expanded_size=0x%X'),
-                     self, index, key, value, compressed_size, expanded_size)
 
         return compressed_size, expanded_size
 
@@ -434,7 +412,6 @@ class MapChunksHandler(ChunksHandler):
         return self
 
     def extract_chunk(self, index):
-        self._log_extract_chunk(index)
         data_stream = self._data_stream
         carmacized = self._carmacized
         rlew_tag = self._rlew_tag
