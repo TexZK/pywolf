@@ -59,6 +59,7 @@ TODO list
 * Refactor the test framework
 * Add type hints
 * Rename `persistence` into `storage`
+* Add CLI
 * ... so much to do ...
 
 
