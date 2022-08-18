@@ -30,16 +30,19 @@ import os
 groups = ['audio', 'graphics', 'map', 'vswap']
 
 for group in groups:
+    print('=' * 80)
+    print('\t', group)
     filenames = glob.glob(f'{group}*.chunk', recursive=False)
     filenames.sort()
+    checksums = {}
 
     for filename in filenames:
         with open(filename, 'rb') as infile:
             data = infile.read()
-        checksum = hashlib.md5(data)
-        text = checksum.hexdigest()
-        print(text, filename)
+        checksum = hashlib.md5(data).hexdigest()
+        checksums[filename] = checksum
+        print(checksum, filename)
 
-        md5path = os.path.splitext(filename)[0] + '.md5'
-        with open(md5path, 'wt') as outfile:
-            outfile.write(text)
+    with open(f'{group}.md5', 'wt') as outfile:
+        for filename in filenames:
+            outfile.write(f'{checksums[filename]}:{filename}\n')
