@@ -90,7 +90,8 @@ def huffman_trace(
             huffman_trace(code1 - HUFFMAN_NODE_COUNT, shift, mask,
                           nodes, shifts, masks, counts)
 
-    elif counts[code0] < HUFFMAN_NODE_COUNT or counts[code1] < HUFFMAN_NODE_COUNT:
+    elif (counts[code0 - HUFFMAN_NODE_COUNT] < HUFFMAN_NODE_COUNT or
+          counts[code1 - HUFFMAN_NODE_COUNT] < HUFFMAN_NODE_COUNT):
         raise ValueError('Huffman mask too long')
 
 
@@ -177,18 +178,18 @@ def huffman_compress(
 def huffman_expand(
     data: ByteString,
     expanded_size: int,
-    nodes: Sequence[Tuple[int, int]]
+    nodes: Sequence[Tuple[int, int]],
 ) -> bytearray:
 
-    if expanded_size < 1:
-        raise ValueError('expanded size not positive')
+    if expanded_size < 0:
+        raise ValueError('negative expanded size')
     head = nodes[HUFFMAN_HEAD_INDEX]
     output = bytearray()
     append = output.append
 
     it = iter(data)
     try:
-        datum = next(it)
+        datum = it.__next__()
         mask = 1 << 0
         node = head
 
@@ -203,7 +204,7 @@ def huffman_expand(
                 node = nodes[value - HUFFMAN_NODE_COUNT]
 
             if mask == 1 << 7:
-                datum = next(it)
+                datum = it.__next__()
                 mask = 1 << 0
             else:
                 mask <<= 1
@@ -304,19 +305,19 @@ def carmack_expand(
     it = iter(data)
     ahead = expanded_size >> 1
     while ahead:
-        count, tag = next(it), next(it)
+        count, tag = it.__next__(), it.__next__()
         if tag == CARMACK_NEAR_TAG or tag == CARMACK_FAR_TAG:
             if count:
                 if ahead < count:
                     break
                 if tag == CARMACK_NEAR_TAG:
-                    offset = len(output) - (next(it) << 1)
+                    offset = len(output) - (it.__next__() << 1)
                 else:
-                    offset = (next(it) | (next(it) << 8)) << 1
+                    offset = (it.__next__() | (it.__next__() << 8)) << 1
                 extend(output[offset:(offset + (count << 1))])
                 ahead -= count
             else:
-                append(next(it))
+                append(it.__next__())
                 append(tag)
                 ahead -= 1
         else:
@@ -337,7 +338,7 @@ def rle_compress(
     append = output.append
     extend = output.extend
     count = 0
-    old = tag
+    old = None
 
     for datum in source:
         if datum == old and count < max_count:
@@ -352,7 +353,12 @@ def rle_compress(
             count = 1
             old = datum
 
-    extend(old for _ in range(count))
+    if count > 3 or old == tag:
+        append(tag)
+        append(count)
+        append(old)
+    else:
+        extend(old for _ in range(count))
 
 
 def rle_expand(
@@ -364,17 +370,15 @@ def rle_expand(
     append = output.append
     extend = output.extend
     it = iter(source)
-
     try:
         while True:
-            datum = next(it)
+            datum = it.__next__()
             if datum == tag:
-                count = next(it)
-                value = next(it)
+                count = it.__next__()
+                value = it.__next__()
                 extend(value for _ in range(count))
             else:
                 append(datum)
-
     except StopIteration:
         pass
 
@@ -385,6 +389,8 @@ def rlew_compress(
 ) -> bytes:
 
     source = array.array('H', data)
+    if sys.byteorder != 'little':
+        source.byteswap()
     output = array.array('H')
     rle_compress(source, output, tag, 0xFFFF)
     if sys.byteorder != 'little':
@@ -399,10 +405,12 @@ def rlew_expand(
 ) -> bytes:
 
     source = array.array('H', data)
+    if sys.byteorder != 'little':
+        source.byteswap()
     output = array.array('H')
-    rle_expand(source, output, tag)
     if sys.byteorder != 'little':
         output.byteswap()
+    rle_expand(source, output, tag)
     output = output.tobytes()
     return output
 
