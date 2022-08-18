@@ -164,7 +164,7 @@ def test_huffman_build_masks():
 
 # ----------------------------------------------------------------------------
 
-def test_huffman_compress__empty(temppath, datapath):
+def test_huffman_compress__empty(temppath: Path, datapath: Path):
     dat_nodes_path = datapath/'bytes.huffman_nodes.bin'
     out_bytes_path = temppath/'empty.huffman_compress.bin'
     ref_bytes_path = datapath/'empty.huffman_compress.bin'
@@ -178,7 +178,7 @@ def test_huffman_compress__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_huffman_compress__bytes(temppath, datapath):
+def test_huffman_compress__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.bin'
     out_bytes_path = temppath/'bytes.huffman_compress.bin'
     ref_bytes_path = datapath/'bytes.huffman_compress.bin'
@@ -192,7 +192,7 @@ def test_huffman_compress__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_huffman_compress__ladder(temppath, datapath):
+def test_huffman_compress__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.bin'
     out_bytes_path = temppath/'ladder.huffman_compress.bin'
     ref_bytes_path = datapath/'ladder.huffman_compress.bin'
@@ -208,7 +208,7 @@ def test_huffman_compress__ladder(temppath, datapath):
 
 # ----------------------------------------------------------------------------
 
-def test_huffman_expand__empty(temppath, datapath):
+def test_huffman_expand__empty(temppath: Path, datapath: Path):
     dat_nodes_path = datapath/'bytes.huffman_nodes.bin'
     dat_bytes_path = datapath/'empty.huffman_compress.bin'
     out_bytes_path = temppath/'empty.huffman_expand.bin'
@@ -220,7 +220,7 @@ def test_huffman_expand__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_huffman_expand__bytes(temppath, datapath):
+def test_huffman_expand__bytes(temppath: Path, datapath: Path):
     dat_nodes_path = datapath/'bytes.huffman_nodes.bin'
     dat_bytes_path = datapath/'bytes.huffman_compress.bin'
     out_bytes_path = temppath/'bytes.huffman_expand.bin'
@@ -233,7 +233,7 @@ def test_huffman_expand__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_huffman_expand__ladder(temppath, datapath):
+def test_huffman_expand__ladder(temppath: Path, datapath: Path):
     dat_nodes_path = datapath/'ladder.huffman_nodes.bin'
     dat_bytes_path = datapath/'ladder.huffman_compress.bin'
     out_bytes_path = temppath/'ladder.huffman_expand.bin'
@@ -256,7 +256,7 @@ def test_carmack_compress__wrong():
         carmack_compress(b'123')
 
 
-def test_carmack_compress__zeros(temppath, datapath):
+def test_carmack_compress__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.bin'
     out_bytes_path = temppath/'zeros.carmack_compress.bin'
     ref_bytes_path = datapath/'zeros.carmack_compress.bin'
@@ -267,7 +267,7 @@ def test_carmack_compress__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_carmack_compress__bytes(temppath, datapath):
+def test_carmack_compress__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.bin'
     out_bytes_path = temppath/'bytes.carmack_compress.bin'
     ref_bytes_path = datapath/'bytes.carmack_compress.bin'
@@ -278,7 +278,7 @@ def test_carmack_compress__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_carmack_compress__ladder(temppath, datapath):
+def test_carmack_compress__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.bin'
     out_bytes_path = temppath/'ladder.carmack_compress.bin'
     ref_bytes_path = datapath/'ladder.carmack_compress.bin'
@@ -292,7 +292,7 @@ def test_carmack_compress__ladder(temppath, datapath):
 # ----------------------------------------------------------------------------
 
 
-def test_carmack_expand__zeros(temppath, datapath):
+def test_carmack_expand__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.carmack_compress.bin'
     out_bytes_path = temppath/'zeros.carmack_expand.bin'
     ref_bytes_path = datapath/'zeros.bin'
@@ -303,7 +303,7 @@ def test_carmack_expand__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_carmack_expand__bytes(temppath, datapath):
+def test_carmack_expand__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.carmack_compress.bin'
     out_bytes_path = temppath/'bytes.carmack_expand.bin'
     ref_bytes_path = datapath/'bytes.bin'
@@ -314,7 +314,7 @@ def test_carmack_expand__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_carmack_expand__ladder(temppath, datapath):
+def test_carmack_expand__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.carmack_compress.bin'
     out_bytes_path = temppath/'ladder.carmack_expand.bin'
     ref_bytes_path = datapath/'ladder.bin'
@@ -327,7 +327,7 @@ def test_carmack_expand__ladder(temppath, datapath):
 
 # ============================================================================
 
-def test_rleb_compress__empty(temppath, datapath):
+def test_rleb_compress__empty(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'empty.bin'
     out_bytes_path = temppath/'empty.rleb_compress.bin'
     ref_bytes_path = datapath/'empty.rleb_compress.bin'
@@ -338,7 +338,7 @@ def test_rleb_compress__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_compress__zeros(temppath, datapath):
+def test_rleb_compress__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.bin'
     out_bytes_path = temppath/'zeros.rleb_compress.bin'
     ref_bytes_path = datapath/'zeros.rleb_compress.bin'
@@ -349,7 +349,7 @@ def test_rleb_compress__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_compress__bytes(temppath, datapath):
+def test_rleb_compress__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.bin'
     out_bytes_path = temppath/'bytes.rleb_compress.bin'
     ref_bytes_path = datapath/'bytes.rleb_compress.bin'
@@ -360,7 +360,7 @@ def test_rleb_compress__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_compress__ladder(temppath, datapath):
+def test_rleb_compress__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.bin'
     out_bytes_path = temppath/'ladder.rleb_compress.bin'
     ref_bytes_path = datapath/'ladder.rleb_compress.bin'
@@ -373,7 +373,7 @@ def test_rleb_compress__ladder(temppath, datapath):
 
 # ----------------------------------------------------------------------------
 
-def test_rleb_expand__empty(temppath, datapath):
+def test_rleb_expand__empty(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'empty.rleb_compress.bin'
     out_bytes_path = temppath/'empty.rleb_expand.bin'
     ref_bytes_path = datapath/'empty.bin'
@@ -384,7 +384,7 @@ def test_rleb_expand__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_expand__zeros(temppath, datapath):
+def test_rleb_expand__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.rleb_compress.bin'
     out_bytes_path = temppath/'zeros.rleb_expand.bin'
     ref_bytes_path = datapath/'zeros.bin'
@@ -395,7 +395,7 @@ def test_rleb_expand__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_expand__bytes(temppath, datapath):
+def test_rleb_expand__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.rleb_compress.bin'
     out_bytes_path = temppath/'bytes.rleb_expand.bin'
     ref_bytes_path = datapath/'bytes.bin'
@@ -406,7 +406,7 @@ def test_rleb_expand__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rleb_expand__ladder(temppath, datapath):
+def test_rleb_expand__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.rleb_compress.bin'
     out_bytes_path = temppath/'ladder.rleb_expand.bin'
     ref_bytes_path = datapath/'ladder.bin'
@@ -419,7 +419,7 @@ def test_rleb_expand__ladder(temppath, datapath):
 
 # ============================================================================
 
-def test_rlew_compress__empty(temppath, datapath):
+def test_rlew_compress__empty(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'empty.bin'
     out_bytes_path = temppath/'empty.rlew_compress.bin'
     ref_bytes_path = datapath/'empty.rlew_compress.bin'
@@ -430,7 +430,7 @@ def test_rlew_compress__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_compress__zeros(temppath, datapath):
+def test_rlew_compress__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.bin'
     out_bytes_path = temppath/'zeros.rlew_compress.bin'
     ref_bytes_path = datapath/'zeros.rlew_compress.bin'
@@ -441,7 +441,7 @@ def test_rlew_compress__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_compress__bytes(temppath, datapath):
+def test_rlew_compress__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.bin'
     out_bytes_path = temppath/'bytes.rlew_compress.bin'
     ref_bytes_path = datapath/'bytes.rlew_compress.bin'
@@ -452,7 +452,7 @@ def test_rlew_compress__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_compress__ladder(temppath, datapath):
+def test_rlew_compress__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.bin'
     out_bytes_path = temppath/'ladder.rlew_compress.bin'
     ref_bytes_path = datapath/'ladder.rlew_compress.bin'
@@ -465,7 +465,7 @@ def test_rlew_compress__ladder(temppath, datapath):
 
 # ----------------------------------------------------------------------------
 
-def test_rlew_expand__empty(temppath, datapath):
+def test_rlew_expand__empty(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'empty.rlew_compress.bin'
     out_bytes_path = temppath/'empty.rlew_expand.bin'
     ref_bytes_path = datapath/'empty.bin'
@@ -476,7 +476,7 @@ def test_rlew_expand__empty(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_expand__zeros(temppath, datapath):
+def test_rlew_expand__zeros(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'zeros.rlew_compress.bin'
     out_bytes_path = temppath/'zeros.rlew_expand.bin'
     ref_bytes_path = datapath/'zeros.bin'
@@ -487,7 +487,7 @@ def test_rlew_expand__zeros(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_expand__bytes(temppath, datapath):
+def test_rlew_expand__bytes(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'bytes.rlew_compress.bin'
     out_bytes_path = temppath/'bytes.rlew_expand.bin'
     ref_bytes_path = datapath/'bytes.bin'
@@ -498,7 +498,7 @@ def test_rlew_expand__bytes(temppath, datapath):
     assert out_bytes == ref_bytes
 
 
-def test_rlew_expand__ladder(temppath, datapath):
+def test_rlew_expand__ladder(temppath: Path, datapath: Path):
     dat_bytes_path = datapath/'ladder.rlew_compress.bin'
     out_bytes_path = temppath/'ladder.rlew_expand.bin'
     ref_bytes_path = datapath/'ladder.bin'
