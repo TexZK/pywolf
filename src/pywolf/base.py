@@ -29,7 +29,6 @@ import io
 from typing import ByteString
 from typing import Iterator
 from typing import Optional
-from typing import Self
 from typing import Sequence
 from typing import Tuple
 from typing import TypeVar
@@ -129,7 +128,7 @@ class Codec(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple['Codec', Offset]:
         ...
 
     def into_stream(self, stream: io.BytesIO) -> None:
@@ -137,8 +136,8 @@ class Codec(abc.ABC):
         stream.write(chunk)
 
     @classmethod
-    def from_stream(cls, stream: io.BytesIO) -> Self:
+    def from_stream(cls, stream: io.BytesIO) -> 'Codec':
         size = cls.calcsize_stateless()
         chunk = stream.read(size)
-        instance = cls.from_bytes(chunk)
+        instance, _ = cls.from_bytes(chunk)
         return instance

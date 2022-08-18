@@ -119,11 +119,11 @@ class TileMapHeader(Codec):
         cls,
         stream: io.BufferedReader,
         plane_count: int = PLANE_COUNT,
-    ) -> Self:
+    ) -> 'TileMapHeader':
 
         size = cls.calcsize_stateless(plane_count=plane_count)
         chunk = stream.read(size)
-        instance = cls.from_bytes(chunk)
+        instance, _ = cls.from_bytes(chunk)
         return instance
 
 

@@ -34,7 +34,6 @@ from typing import Iterable
 from typing import Iterator
 from typing import List
 from typing import Optional
-from typing import Self
 from typing import Sequence
 from typing import Tuple
 from typing import cast as _cast
@@ -406,7 +405,7 @@ class AdLibSoundHeader(Codec):
                            self.block)
 
     @classmethod
-    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple['AdLibSoundHeader', Offset]:
         offset = int(offset)
         args = struct.unpack_from('<LH13B3sB', buffer, offset)
         offset += struct.calcsize('<LH13B3sB')
@@ -483,7 +482,7 @@ class AdLibSound(Codec):
         return chunk
 
     @classmethod
-    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple['AdLibSound', Offset]:
         offset = int(offset)
         header, offset = AdLibSoundHeader.from_bytes(buffer, offset)
         events: List[Tuple[int, int, int]] = []
@@ -498,10 +497,11 @@ class AdLibSound(Codec):
         return instance, offset
 
     @classmethod
-    def from_stream(cls, stream: io.BufferedReader) -> Self:
+    def from_stream(cls, stream: io.BufferedReader) -> 'AdLibSound':
         size = cls.calcsize_stateless()
         chunk = stream.read(size)
-        return cls.from_bytes(chunk)
+        instance, _ = cls.from_bytes(chunk)
+        return instance
 
     def to_imf_chunk(
         self,
@@ -593,7 +593,7 @@ class Music(Codec):
         return self.to_imf_chunk()
 
     @classmethod
-    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple['Music', Offset]:
         offset = int(offset)
         length, = struct.unpack_from('<H', buffer, offset)
         offset += 2
@@ -612,11 +612,11 @@ class Music(Codec):
         return instance, offset
 
     @classmethod
-    def from_stream(cls, stream: io.BufferedReader) -> Self:
+    def from_stream(cls, stream: io.BufferedReader) -> 'Music':
         buffer = stream.read(2)
         length, = struct.unpack('<H', buffer)
         buffer += stream.read(length * 4)
-        instance = cls.from_bytes(buffer)
+        instance, _ = cls.from_bytes(buffer)
         return instance
 
     def to_imf_chunk(self):

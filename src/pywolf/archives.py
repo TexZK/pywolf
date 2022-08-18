@@ -26,12 +26,12 @@
 import abc
 import collections.abc
 import io
+import struct
 from typing import Dict
 from typing import Iterator
 from typing import List
 from typing import Mapping
 from typing import Optional
-from typing import Self
 from typing import Sequence
 from typing import Tuple
 from typing import Union
@@ -129,7 +129,7 @@ class ArchiveReader(collections.abc.Mapping[Index, Chunk]):
         data_stream: Optional[io.BufferedReader] = None,
         data_offset: Optional[Offset] = None,
         data_size: Optional[Offset] = None,
-    ) -> Self:
+    ) -> None:
 
         if data_stream is None:
             raise ValueError('a data stream should be provided')
@@ -138,7 +138,6 @@ class ArchiveReader(collections.abc.Mapping[Index, Chunk]):
         self._data_stream = data_stream
         self._data_offset = data_offset
         self._data_size = data_size
-        return self
 
     def close(self) -> None:
         self._data_stream = None
@@ -207,7 +206,7 @@ class AudioArchiveReader(ArchiveReader):
         header_stream: Optional[io.BufferedReader] = None,
         header_offset: Optional[Offset] = None,
         header_size: Optional[Offset] = None,
-    ) -> Self:
+    ) -> None:
 
         if header_stream is None:
             raise ValueError('a header stream should be provided')
@@ -233,7 +232,6 @@ class AudioArchiveReader(ArchiveReader):
         self._header_stream = header_stream
         self._header_offset = header_offset
         self._header_size = header_size
-        return self
 
 
 class GraphicsArchiveReader(ArchiveReader):
@@ -249,13 +247,13 @@ class GraphicsArchiveReader(ArchiveReader):
         self._huffman_size: Offset = 0
         self._partition_map: Dict[str, Tuple[Index, Index]] = {}
         self._pics_size_index: Index = -1
-        self._huffman_nodes: List[int] = []
+        self._huffman_nodes: List[Tuple[int, int]] = []
         self._pics_size: List[Coords] = []
 
     def _read_pics_size(self) -> List[Coords]:
         count = self._partition_map['pics'][1]
         chunk = self._read_chunk(self._pics_size_index)
-        chunk_stream = io.BufferedReader(chunk)
+        chunk_stream = io.BytesIO(chunk)
         pics_size: List[Coords] = list(stream_unpack_array('<HH', chunk_stream, count, scalar=False))
         return pics_size
 
@@ -269,6 +267,17 @@ class GraphicsArchiveReader(ArchiveReader):
             return chunk
         else:
             return b''
+
+    def _read_huffman_nodes(self) -> List[Tuple[int, int]]:
+        huffman_stream = self._huffman_stream
+        huffman_nodes: List[Tuple[int, int]] = []
+
+        for node_index in range(HUFFMAN_NODE_COUNT):
+            node = struct.unpack('<HH', huffman_stream.read(4))
+            node = _cast(Tuple[int, int], node)
+            huffman_nodes.append(node)
+
+        return huffman_nodes
 
     def _read_sizes(self, index: Index):
         BLOCK_SIZE = (8 * 8) * 1
@@ -349,7 +358,7 @@ class GraphicsArchiveReader(ArchiveReader):
         huffman_size: Optional[Offset] = None,
         partition_map: Optional[GraphicsPartitionMap] = None,
         pics_size_index: Index = 0,
-    ) -> Self:
+    ) -> None:
 
         if header_stream is None:
             raise ValueError('a header stream should be provided')
@@ -392,8 +401,6 @@ class GraphicsArchiveReader(ArchiveReader):
             if not chunk_offsets[index] <= chunk_offsets[index + 1]:
                 raise ValueError(f'invalid offset ordering: index={index}')
 
-        huffman_nodes: List[int] = list(stream_unpack_array('<HH', huffman_stream, HUFFMAN_NODE_COUNT, scalar=False))
-
         self._chunk_count = chunk_count
         self._chunk_offsets = chunk_offsets
         self._header_stream = header_stream
@@ -404,9 +411,8 @@ class GraphicsArchiveReader(ArchiveReader):
         self._huffman_size = huffman_size
         self._partition_map = partition_map
         self._pics_size_index = pics_size_index
-        self._huffman_nodes = huffman_nodes
+        self._huffman_nodes = self._read_huffman_nodes()
         self._pics_size = self._read_pics_size()
-        return self
 
     @property
     def pics_size(self) -> Sequence[Coords]:
@@ -476,7 +482,7 @@ class MapArchiveReader(ArchiveReader):
         header_size: Optional[Offset] = None,
         planes_count: int = 3,
         carmacized: bool = True,
-    ) -> Self:
+    ) -> None:
 
         if header_stream is None:
             raise ValueError('a header stream should be provided')
@@ -523,7 +529,6 @@ class MapArchiveReader(ArchiveReader):
         self._planes_count = planes_count
         self._carmacized = carmacized
         self._rlew_tag = rlew_tag
-        return self
 
     @property
     def planes_count(self) -> int:
@@ -605,7 +610,7 @@ class VswapArchiveReader(ArchiveReader):
         image_size: Coords = (64, 64),
         alpha_index: Optional[ColorIndex] = None,
         data_size_guard: Optional[Offset] = None,
-    ) -> Self:
+    ) -> None:
 
         super().open(data_stream, data_offset=data_offset, data_size=data_size)
 
@@ -652,7 +657,6 @@ class VswapArchiveReader(ArchiveReader):
         self._sprites_start = sprites_start
         self._sounds_start = sounds_start
         self._sounds_infos = self._read_sounds_infos()
-        return self
 
     @property
     def sounds_start(self) -> Index:
