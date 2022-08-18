@@ -23,16 +23,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from importlib import import_module
 import importlib.util
 import io
 import os
 import struct
+from importlib import import_module
+from typing import Any
+from typing import ByteString
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Sequence
+from typing import Tuple
 
-
-def reverse_byte(value):
-    # http://graphics.stanford.edu/~seander/bithacks.html#ReverseByteWith64BitsDiv
-    return (value * 0x0202020202 & 0x010884422010) % 1023
+from .base import Offset
 
 
 def load_as_module(module_name, path):
@@ -91,73 +95,98 @@ def find_partition(index, partition_map, count_sign=1, cache=None):
     return found
 
 
-def stream_fit(stream, offset=None, size=None):
+def stream_fit(
+    stream: io.BufferedReader,
+    offset: Optional[Offset] = None,
+    size: Optional[Offset] = None,
+) -> Tuple[Offset, Offset]:
+
     if offset is None:
         offset = stream.tell()
     else:
-        offset = int(offset)
+        offset = offset.__index__()
+        if offset < 0:
+            raise ValueError('negative offset')
 
     if size is None:
         stream.seek(0, io.SEEK_END)
         size = stream.tell() - offset
-        stream.seek(offset, io.SEEK_SET)
     else:
-        size = int(size)
+        size = size.__index__()
+        if size < 0:
+            raise ValueError('negative size')
 
+    stream.seek(offset, io.SEEK_SET)
     return offset, size
 
 
-def stream_read(stream, size):
-    chunks = []
-    remaining = size
-    while remaining:
-        chunk = stream.read(remaining)
-        if chunk:
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        else:
-            fmt = 'EOF at stream {!s} offset 0x{:X}'.format
-            raise IOError(fmt(stream, stream.tell()))
-    return b''.join(chunks)
+def stream_read(  # TODO remove
+    stream: io.BufferedReader,
+    size: Offset,
+) -> bytes:
+
+    chunk = stream.read(size)
+    return chunk
 
 
-def stream_write(stream, raw):
-    written = 0
-    if isinstance(raw, str):
-        raw_view = raw
-    else:
-        raw_view = memoryview(raw)
-    while written < len(raw):
-        written += stream.write(raw_view[written:])
+def stream_write(  # TODO remove
+    stream: io.BufferedReader,
+    raw: ByteString,
+) -> Offset:
+
+    written = stream.write(raw)
     return written
 
 
-def stream_pack(stream, fmt, *args):
-    return stream_write(stream, struct.pack(fmt, *args))
+def stream_pack(  # TODO remove
+    stream: io.BufferedReader,
+    fmt: str,
+    *args: Any,
+) -> Offset:
+
+    return stream.write(struct.pack(fmt, *args))
 
 
-def stream_pack_array(stream, fmt, values, scalar=True):
+def stream_pack_array(  # TODO remove
+    stream: io.BufferedReader,
+    fmt: str,
+    values: Iterable[Any],
+    scalar: bool = True,
+) -> Offset:
+
+    written = 0
     if scalar:
         for value in values:
-            return stream_write(stream, struct.pack(fmt, value))
+            written += stream.write(struct.pack(fmt, value))
     else:
         for entry in values:
-            return stream_write(stream, struct.pack(fmt, *entry))
+            written += stream.write(struct.pack(fmt, *entry))
+    return written
 
 
-def stream_unpack(fmt, stream):
-    chunk = stream_read(stream, struct.calcsize(fmt))
+def stream_unpack(  # TODO remove
+    fmt: str,
+    stream: io.BufferedReader,
+) -> Sequence[Any]:
+
+    chunk = stream.read(struct.calcsize(fmt))
     return struct.unpack(fmt, chunk)
 
 
-def stream_unpack_array(fmt, stream, count, scalar=True):
+def stream_unpack_array(  # TODO remove
+    fmt: str,
+    stream: io.BufferedReader,
+    count: int,
+    scalar: bool = True
+) -> Iterator[Any]:
+
     if scalar:
         yield from (stream_unpack(fmt, stream)[0] for _ in range(count))
     else:
         yield from (stream_unpack(fmt, stream) for _ in range(count))
 
 
-def sequence_index(index, length):
+def sequence_index(index, length):  # TODO remove
     assert 0 < length
 
     if hasattr(index, '__index__'):
@@ -172,7 +201,7 @@ def sequence_index(index, length):
     return index
 
 
-def sequence_getitem(key, length, getter):
+def sequence_getitem(key, length, getter):  # TODO remove
     if isinstance(key, slice):
         start, stop, step = key.start, key.stop, key.step
         start = sequence_index(start, length)
@@ -182,7 +211,7 @@ def sequence_getitem(key, length, getter):
         return getter(sequence_index(key, length))
 
 
-class BinaryResource(object):
+class BinaryResource(object):  # TODO remove
 
     @classmethod
     def from_stream(cls, stream, *args, **kwargs):
@@ -194,15 +223,15 @@ class BinaryResource(object):
 
     @classmethod
     def from_bytes(cls, data, *args, **kwargs):
-        return cls.from_stream(io.BytesIO(data), *args, **kwargs)
+        return cls.from_stream(io.BufferedReader(data), *args, **kwargs)
 
     def to_bytes(self, *args, **kwargs):
-        stream = io.BytesIO()
+        stream = io.BufferedReader()
         self.to_stream(stream, *args, **kwargs)
         return stream.getvalue()
 
 
-class ResourceManager(object):
+class ResourceManager(object):  # TODO remove
 
     def __init__(self, chunks_handler, start=None, count=None):
         if start is None:
@@ -234,7 +263,7 @@ class ResourceManager(object):
         return chunk
 
 
-class ResourcePrecache(ResourceManager):
+class ResourcePrecache(ResourceManager):  # TODO remove
 
     def __init__(self, wrapped=None, cache=None):
         self._wrapped = wrapped
@@ -267,7 +296,7 @@ class ResourcePrecache(ResourceManager):
         self._cache.extend(self._wrapped)
 
 
-class ResourceCache(ResourceManager):
+class ResourceCache(ResourceManager):  # TODO remove
 
     def __init__(self, wrapped=None, cache=None):
         self._wrapped = wrapped

@@ -13,7 +13,7 @@ import zipfile
 from PIL import Image
 
 import numpy as np
-from pywolf.audio import samples_upsample, wave_write, convert_imf_to_wave, convert_wave_to_ogg
+from pywolf.audio import samples_upsample_zoh, wave_write, convert_imf_to_wave, convert_wave_to_ogg
 import pywolf.game
 from pywolf.graphics import write_targa_bgrx, build_color_image
 import pywolf.persistence
@@ -1360,7 +1360,7 @@ def export_sampled_sounds(params, cfg, zip_file, vswap_chunks_handler):
         name = cfg.SAMPLED_SOUND_NAMES[i]
         path = 'sound/{}/sampled/{}.wav'.format(params.short_name, name)
         logger.info('Sampled sound [%d/%d]: %r', (i + 1), count, path)
-        samples = bytes(samples_upsample(sound.samples, scale_factor))
+        samples = bytes(samples_upsample_zoh(sound.samples, scale_factor))
         wave_file = io.BytesIO()
         wave_write(wave_file, params.wave_rate, samples)
         zip_file.writestr(path, wave_file.getbuffer())

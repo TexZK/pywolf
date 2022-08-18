@@ -25,32 +25,52 @@
 
 import array
 import sys
-
-from pywolf.utils import reverse_byte
-
-
-HUFFMAN_NODE_COUNT = 256
-HUFFMAN_HEAD_INDEX = HUFFMAN_NODE_COUNT - 2
-HUFFMAN_REVERSED = tuple(map(reverse_byte, range(HUFFMAN_NODE_COUNT)))
-
-HUFFMAN_CLONE_NODES = (tuple((HUFFMAN_REVERSED[i], HUFFMAN_REVERSED[i + 1])
-                             for i in range(0, HUFFMAN_NODE_COUNT, 2)) +
-                       tuple((HUFFMAN_NODE_COUNT + i, HUFFMAN_NODE_COUNT + i + 1)
-                             for i in range(0, HUFFMAN_NODE_COUNT - 1, 2)))
-
-HUFFMAN_MAX_DEPTH = 24
-HUFFMAN_MAX_CODE = 0xFFFF
-HUFFMAN_MAX_PROBABILITY = 0x7FFFFFFF
+from typing import ByteString
+from typing import List
+from typing import MutableSequence
+from typing import Sequence
+from typing import Tuple
 
 
-def huffman_count(data):
+def _reverse_byte(value: int) -> int:
+    # http://graphics.stanford.edu/~seander/bithacks.html#ReverseByteWith64BitsDiv
+    return (value * 0x0202020202 & 0x010884422010) % 1023
+
+
+HUFFMAN_NODE_COUNT: int = 256
+HUFFMAN_HEAD_INDEX: int = HUFFMAN_NODE_COUNT - 2
+HUFFMAN_REVERSED: List[int] = [_reverse_byte(i) for i in range(HUFFMAN_NODE_COUNT)]
+
+HUFFMAN_CLONE_NODES = (
+    [(HUFFMAN_REVERSED[i], HUFFMAN_REVERSED[i + 1])
+     for i in range(0, HUFFMAN_NODE_COUNT, 2)]
+    +
+    [(HUFFMAN_NODE_COUNT + i, HUFFMAN_NODE_COUNT + i + 1)
+     for i in range(0, HUFFMAN_NODE_COUNT - 1, 2)]
+)
+
+HUFFMAN_MAX_DEPTH: int = 24
+HUFFMAN_MAX_CODE: int = 0xFFFF
+HUFFMAN_MAX_PROBABILITY: int = 0x7FFFFFFF
+
+
+def huffman_count(data: ByteString) -> List[int]:
     counts = [0] * HUFFMAN_NODE_COUNT
     for datum in data:
         counts[datum] += 1
     return counts
 
 
-def huffman_trace(index, shift, mask, nodes, shifts, masks, counts):
+def huffman_trace(
+    index: int,
+    shift: int,
+    mask: int,
+    nodes: Sequence[Tuple[int, int]],
+    shifts: MutableSequence[int],
+    masks: MutableSequence[int],
+    counts: Sequence[int]
+) -> None:
+
     code0, code1 = nodes[index]
     shift += 1
 
@@ -74,10 +94,10 @@ def huffman_trace(index, shift, mask, nodes, shifts, masks, counts):
         raise ValueError('Huffman mask too long')
 
 
-def huffman_build_nodes(counts, as_tuples=True):
-    probs = list(counts)
+def huffman_build_nodes(counts: Sequence[int]) -> List[Tuple[int, int]]:
+    probs: List[int] = list(counts)
     values = list(range(HUFFMAN_NODE_COUNT))
-    nodes = [(0, 0)] * HUFFMAN_NODE_COUNT
+    nodes: List[Tuple[int, int]] = [(0, 0)] * HUFFMAN_NODE_COUNT
 
     for index in range(HUFFMAN_NODE_COUNT):
         prob0 = min(probs)
@@ -105,25 +125,31 @@ def huffman_build_nodes(counts, as_tuples=True):
             value0 = values[code0]
         value1 = values[code1]
 
-        nodes[index] = [value0, value1]
+        nodes[index] = (value0, value1)
         values[code0] = HUFFMAN_NODE_COUNT + index
         probs[code0] += probs[code1]
         probs[code1] = HUFFMAN_MAX_PROBABILITY
 
-    if as_tuples:
-        nodes = tuple(tuple(node) for node in nodes)
-
     return nodes
 
 
-def huffman_build_masks(counts, nodes):
+def huffman_build_masks(
+    counts: Sequence[int],
+    nodes: Sequence[Tuple[int, int]],
+) -> Tuple[List[int], List[int]]:
+
     shifts = [0] * HUFFMAN_NODE_COUNT
     masks = [0] * HUFFMAN_NODE_COUNT
     huffman_trace(HUFFMAN_HEAD_INDEX, 0, 0, nodes, shifts, masks, counts)
     return shifts, masks
 
 
-def huffman_compress(data, shifts, masks):
+def huffman_compress(
+    data: ByteString,
+    shifts: Sequence[int],
+    masks: Sequence[int],
+) -> bytes:
+
     output = bytearray(len(data) + 4)
     shift = 0
     tail = 0
@@ -148,9 +174,14 @@ def huffman_compress(data, shifts, masks):
     return output
 
 
-def huffman_expand(data, expanded_size, nodes):
-    assert expanded_size > 0
+def huffman_expand(
+    data: ByteString,
+    expanded_size: int,
+    nodes: Sequence[Tuple[int, int]]
+) -> bytearray:
 
+    if expanded_size < 1:
+        raise ValueError('expanded size not positive')
     head = nodes[HUFFMAN_HEAD_INDEX]
     output = bytearray()
     append = output.append
@@ -180,18 +211,22 @@ def huffman_expand(data, expanded_size, nodes):
     except StopIteration:
         output += bytes(expanded_size - len(output))
 
-    output = bytes(output)
     return output
 
 
-CARMACK_NEAR_TAG = 0xA7
-CARMACK_FAR_TAG = 0xA8
-CARMACK_MAX_SIZE = 1 << 17
+CARMACK_NEAR_TAG: int = 0xA7
+CARMACK_FAR_TAG: int = 0xA8
+CARMACK_MAX_SIZE: int = 1 << 17
 
 
-def carmack_compress(data):
-    assert len(data) > 0
-    assert len(data) % 2 == 0
+def carmack_compress(
+    data: ByteString,
+) -> bytearray:
+
+    if len(data) < 2:
+        raise ValueError('not enough data to compress')
+    if len(data) % 2:
+        raise ValueError('data size must be divisible by 2')
 
     source = array.array('H', data)
     if sys.byteorder != 'little':
@@ -199,7 +234,6 @@ def carmack_compress(data):
 
     output = bytearray()
     append = output.append
-
     ahead = len(source)
     index = 0
 
@@ -250,13 +284,18 @@ def carmack_compress(data):
     if ahead < 0:
         raise ValueError('ahead < 0')
 
-    output = bytes(output)
     return output
 
 
-def carmack_expand(data, expanded_size):
-    assert expanded_size > 0
-    assert expanded_size % 2 == 0
+def carmack_expand(
+    data: ByteString,
+    expanded_size: int,
+) -> bytearray:
+
+    if expanded_size < 2:
+        raise ValueError('not enough data to expand')
+    if expanded_size % 2:
+        raise ValueError('expanded size must be divisible by 2')
 
     output = bytearray()
     append = output.append
@@ -285,16 +324,21 @@ def carmack_expand(data, expanded_size):
             append(tag)
             ahead -= 1
 
-    output = bytes(output)
     return output
 
 
-def rle_compress(source, output, tag, max_count):
+def rle_compress(
+    source: Sequence[int],
+    output: MutableSequence[int],
+    tag: int,
+    max_count: int,
+) -> None:
+
     append = output.append
     extend = output.extend
-
     count = 0
     old = tag
+
     for datum in source:
         if datum == old and count < max_count:
             count += 1
@@ -311,11 +355,16 @@ def rle_compress(source, output, tag, max_count):
     extend(old for _ in range(count))
 
 
-def rle_expand(source, output, tag):
+def rle_expand(
+    source: Sequence[int],
+    output: MutableSequence[int],
+    tag: int,
+) -> None:
+
     append = output.append
     extend = output.extend
-
     it = iter(source)
+
     try:
         while True:
             datum = next(it)
@@ -330,43 +379,49 @@ def rle_expand(source, output, tag):
         pass
 
 
-def rlew_compress(data, tag):
+def rlew_compress(
+    data: ByteString,
+    tag: int,
+) -> bytes:
+
     source = array.array('H', data)
     output = array.array('H')
-
     rle_compress(source, output, tag, 0xFFFF)
-
     if sys.byteorder != 'little':
         output.byteswap()
     output = output.tobytes()
     return output
 
 
-def rlew_expand(data, tag):
+def rlew_expand(
+    data: ByteString,
+    tag: int,
+) -> bytes:
+
     source = array.array('H', data)
     output = array.array('H')
-
     rle_expand(source, output, tag)
-
     if sys.byteorder != 'little':
         output.byteswap()
     output = output.tobytes()
     return output
 
 
-def rleb_compress(data, tag):
+def rleb_compress(
+    data: ByteString,
+    tag: int,
+) -> bytearray:
+
     output = bytearray()
-
     rle_compress(data, output, tag, 0xFF)
-
-    output = bytes(output)
     return output
 
 
-def rleb_expand(data, tag):
+def rleb_expand(
+    data: ByteString,
+    tag: int,
+) -> bytearray:
+
     output = bytearray()
-
     rle_expand(data, output, tag)
-
-    output = bytes(output)
     return output

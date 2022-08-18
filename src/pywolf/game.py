@@ -25,62 +25,129 @@
 
 import array
 import io
+import struct
+from typing import ByteString
+from typing import MutableSequence
+from typing import Self
+from typing import Sequence
+from typing import Tuple
 
-from pywolf.utils import (
-    stream_pack, stream_pack_array, stream_unpack, stream_unpack_array,
-    BinaryResource, ResourceManager
-)
+from .archives import ResourceLibrary
+from .base import Chunk
+from .base import Codec
+from .base import Coord
+from .base import Coords
+from .base import Index
+from .base import Offset
+from .utils import ResourceManager
 
 
-VERTICAL = 0
-HORIZONTAL = 1
+PLANE_COUNT: int = 3
 
 
-class TileMapHeader(BinaryResource):
+class TileMapHeader(Codec):
 
-    def __init__(self, plane_offsets, plane_sizes, size, name):
+    def __init__(
+        self,
+        plane_count: int,
+        plane_offsets: Sequence[Offset],
+        plane_sizes: Sequence[Coord],
+        size: Coords,
+        name: str,
+    ):
+        if plane_count < 1:
+            raise ValueError('invalid plane count')
+        if len(plane_offsets) != plane_count:
+            raise ValueError('inconsistent plane offsets count')
+        if len(plane_sizes) != plane_count:
+            raise ValueError('inconsistent plane sizes count')
+
         self.plane_offsets = plane_offsets
         self.plane_sizes = plane_sizes
         self.size = size
         self.name = name
 
     @classmethod
-    def from_stream(cls, stream, planes_count=3):
-        planes_count = int(planes_count)
-        assert planes_count > 0
-        plane_offsets = tuple(stream_unpack_array('<L', stream, planes_count))
-        plane_sizes = tuple(stream_unpack_array('<H', stream, planes_count))
-        size = stream_unpack('<HH', stream)
-        name = stream_unpack('<16s', stream)[0].decode('ascii')
+    def calcsize_stateless(cls, plane_count: int = PLANE_COUNT) -> Offset:
+        if plane_count < 1:
+            raise ValueError('invalid plane count')
+        return (plane_count * 4) + (plane_count * 2) + (2 * 2) + 16
+
+    def to_bytes(self) -> bytes:
+        chunk = struct.pack(
+            f'<{len(self.plane_offsets)}L{len(self.plane_sizes)}H2H16s',
+            *self.plane_offsets,
+            *self.plane_sizes,
+            *self.size,
+            self.name.encode('ascii').ljust(16, b'\0')
+        )
+        return chunk
+
+    @classmethod
+    def from_bytes(
+        cls,
+        buffer: ByteString,
+        offset: Offset = 0,
+        plane_count: int = PLANE_COUNT,
+    ) -> Tuple[Self, Offset]:
+
+        if plane_count < 1:
+            raise ValueError('invalid plane count')
+
+        offset = int(offset)
+        plane_offsets = struct.unpack_from(f'<{plane_count}L', buffer, offset)
+        offset += plane_count * 4
+
+        plane_sizes = struct.unpack_from(f'<{plane_count}H', buffer, offset)
+        offset += plane_count * 2
+
+        width, height = struct.unpack_from(f'<2H', buffer, offset)
+        offset += 2
+        size = (width, height)
+
+        name = struct.unpack_from(f'<16s', buffer, offset)[0].decode('ascii')
         null_char_index = name.find('\0')
         if null_char_index >= 0:
             name = name[:null_char_index]
         name = name.rstrip(' \t\r\n\v\0')
-        return cls(plane_offsets, plane_sizes, size, name)
 
-    def to_stream(self, stream):
-        stream_pack_array(stream, '<L', self.plane_offsets)
-        stream_pack_array(stream, '<H', self.plane_sizes)
-        stream_pack(stream, '<HH', *self.size)
-        stream_pack(stream, '<16s', self.name.encode('ascii'))
+        instance = cls(plane_count, plane_offsets, plane_sizes, size, name)
+        return instance, offset
 
     @classmethod
-    def from_bytes(cls, data, planes_count=3):
-        return cls.from_stream(io.BytesIO(data), planes_count)
+    def from_stream(
+        cls,
+        stream: io.BufferedReader,
+        plane_count: int = PLANE_COUNT,
+    ) -> Self:
+
+        size = cls.calcsize_stateless(plane_count=plane_count)
+        chunk = stream.read(size)
+        instance = cls.from_bytes(chunk)
+        return instance
 
 
-class TileMap(object):
+class TileMap:
 
-    def __init__(self, size, planes, name):
+    def __init__(
+        self,
+        size: Coords,
+        planes_flat: Sequence[MutableSequence[int]],
+        name: str,
+    ):
         width, height = size
+        if width < 1 or height < 1:
+            raise ValueError(f'invalid map size: {size}')
         area = width * height
-        assert all(len(plane) == area for plane in planes)
+        for plane_flat in planes_flat:
+            if len(plane_flat) != area:
+                raise ValueError('inconsistent plane size')
 
-        self.size = size
-        self.name = name
-        self.planes = planes
+        self.size: Coords = size
+        self.name: str = name
+        self.planes: Sequence[MutableSequence[int]] = planes_flat
 
-    def __getitem__(self, key):
+    def __getitem__(self, key):  # FIXME TODO
         planes = self.planes
         height = self.size[1]
         assert 2 <= len(key) <= 3
@@ -93,7 +160,7 @@ class TileMap(object):
         else:
             return [planes[i][tile_offset] for i in range(len(planes))]
 
-    def __settitem__(self, key, value):
+    def __setitem__(self, key, value):  # FIXME TODO
         planes = self.planes
         height = self.size[1]
         assert 2 <= len(key) <= 3
@@ -108,7 +175,7 @@ class TileMap(object):
             for i in range(len(planes)):
                 planes[i][tile_offset] = value[i]
 
-    def get(self, key, default=None):
+    def get(self, key, default=None):  # FIXME TODO
         width, height = self.size
         tile_x, tile_y, *_ = key
         tile_offset = tile_y * height + tile_x
@@ -117,7 +184,7 @@ class TileMap(object):
         else:
             return default
 
-    def check_coords(self, tile_coords):
+    def check_coords(self, tile_coords: Coords) -> bool:
         return (0 <= tile_coords[0] < self.size[0] and
                 0 <= tile_coords[1] < self.size[1])
 
@@ -130,7 +197,18 @@ class TileMapManager(ResourceManager):
     def _load_resource(self, index, chunk):
         header, raw_planes = chunk
         planes = [array.array('H', raw_plane) for raw_plane in raw_planes]
-        return TileMap(header.size, planes, header.name)
+        instance = TileMap(header.size, planes, header.name)
+        return instance
+
+
+class TileMapLibrary(ResourceLibrary[Index, TileMap]):
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> TileMap:
+        del index
+        header, raw_planes = chunk  # FIXME how to do this ???
+        planes_flat = [array.array('H', raw_plane) for raw_plane in raw_planes]
+        instance = TileMap(header.size, planes_flat, header.name)
+        return instance
 
 
 class Game(object):  # TODO
@@ -142,4 +220,3 @@ class Game(object):  # TODO
         self.gamemap = gamemap
         self.entities = {}  # all
         self.players = {}
-

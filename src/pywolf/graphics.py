@@ -23,79 +23,81 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import collections
+import io
 import struct
+from typing import Any
+from typing import ByteString
+from typing import Dict
+from typing import Iterator
+from typing import List
+from typing import Mapping
+from typing import Optional
+from typing import Self
+from typing import Sequence
+from typing import Tuple
+from typing import Union
+from typing import cast as _cast
 
-from PIL import Image, ImageDraw
-from pywolf.utils import (
-    stream_write, stream_pack, stream_unpack,
-    stream_pack_array, stream_unpack_array,
-    BinaryResource, ResourceManager
-)
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
 
-
-ALPHA_INDEX = 0xFF
-
-CP437_CHARS = (
-    '\u0000', '\u263A', '\u263B', '\u2665', '\u2666', '\u2663', '\u2660', '\u2022',
-    '\u25D8', '\u25CB', '\u25D9', '\u2642', '\u2640', '\u266A', '\u266B', '\u263C',
-    '\u25BA', '\u25C4', '\u2195', '\u203C', '\u00B6', '\u00A7', '\u25AC', '\u21A8',
-    '\u2191', '\u2193', '\u2192', '\u2190', '\u221F', '\u2194', '\u25B2', '\u25BC',
-    '\u0020', '\u0021', '\u0022', '\u0023', '\u0024', '\u0025', '\u0026', '\u0027',
-    '\u0028', '\u0029', '\u002A', '\u002B', '\u002C', '\u002D', '\u002E', '\u002F',
-    '\u0030', '\u0031', '\u0032', '\u0033', '\u0034', '\u0035', '\u0036', '\u0037',
-    '\u0038', '\u0039', '\u003A', '\u003B', '\u003C', '\u003D', '\u003E', '\u003F',
-    '\u0040', '\u0041', '\u0042', '\u0043', '\u0044', '\u0045', '\u0046', '\u0047',
-    '\u0048', '\u0049', '\u004A', '\u004B', '\u004C', '\u004D', '\u004E', '\u004F',
-    '\u0050', '\u0051', '\u0052', '\u0053', '\u0054', '\u0055', '\u0056', '\u0057',
-    '\u0058', '\u0059', '\u005A', '\u005B', '\u005C', '\u005D', '\u005E', '\u005F',
-    '\u0060', '\u0061', '\u0062', '\u0063', '\u0064', '\u0065', '\u0066', '\u0067',
-    '\u0068', '\u0069', '\u006A', '\u006B', '\u006C', '\u006D', '\u006E', '\u006F',
-    '\u0070', '\u0071', '\u0072', '\u0073', '\u0074', '\u0075', '\u0076', '\u0077',
-    '\u0078', '\u0079', '\u007A', '\u007B', '\u007C', '\u007D', '\u007E', '\u2302',
-    '\u00C7', '\u00FC', '\u00E9', '\u00E2', '\u00E4', '\u00E0', '\u00E5', '\u00E7',
-    '\u00EA', '\u00EB', '\u00E8', '\u00EF', '\u00EE', '\u00EC', '\u00C4', '\u00C5',
-    '\u00C9', '\u00E6', '\u00C6', '\u00F4', '\u00F6', '\u00F2', '\u00FB', '\u00F9',
-    '\u00FF', '\u00D6', '\u00DC', '\u00A2', '\u00A3', '\u00A5', '\u20A7', '\u0192',
-    '\u00E1', '\u00ED', '\u00F3', '\u00FA', '\u00F1', '\u00D1', '\u00AA', '\u00BA',
-    '\u00BF', '\u2310', '\u00AC', '\u00BD', '\u00BC', '\u00A1', '\u00AB', '\u00BB',
-    '\u2591', '\u2592', '\u2593', '\u2502', '\u2524', '\u2561', '\u2562', '\u2556',
-    '\u2555', '\u2563', '\u2551', '\u2557', '\u255D', '\u255C', '\u255B', '\u2510',
-    '\u2514', '\u2534', '\u252C', '\u251C', '\u2500', '\u253C', '\u255E', '\u255F',
-    '\u255A', '\u2554', '\u2569', '\u2566', '\u2560', '\u2550', '\u256C', '\u2567',
-    '\u2568', '\u2564', '\u2565', '\u2559', '\u2558', '\u2552', '\u2553', '\u256B',
-    '\u256A', '\u2518', '\u250C', '\u2588', '\u2584', '\u258C', '\u2590', '\u2580',
-    '\u03B1', '\u00DF', '\u0393', '\u03C0', '\u03A3', '\u03C3', '\u00B5', '\u03C4',
-    '\u03A6', '\u0398', '\u03A9', '\u03B4', '\u221E', '\u03C6', '\u03B5', '\u2229',
-    '\u2261', '\u00B1', '\u2265', '\u2264', '\u2320', '\u2321', '\u00F7', '\u2248',
-    '\u00B0', '\u2219', '\u00B7', '\u221A', '\u207F', '\u00B2', '\u25A0', '\u00A0',
-)
-
-CP437_MAP = {c: i for i, c in enumerate(CP437_CHARS)}
+from .archives import GraphicsArchiveReader
+from .archives import ResourceLibrary
+from .archives import VswapArchiveReader
+from .base import Cache
+from .base import Char
+from .base import Chunk
+from .base import Codec
+from .base import ColorIndex
+from .base import ColorRGB
+from .base import Coord
+from .base import Coords
+from .base import Index
+from .base import Offset
+from .base import PaletteFlat
+from .base import PaletteRGB
+from .base import PixelsFlat
+# from .utils import stream_pack
+# from .utils import stream_unpack
+# from .utils import stream_unpack_array
+from .utils import ResourceManager
 
 
-def unicode_to_cp437(unicode_text):
-    cp437_bytes = bytes(CP437_MAP[c] for c in unicode_text)
-    return cp437_bytes
+TextArt = str
 
 
-def cp437_to_unicode(cp437_bytes):
-    unicode_text = ''.join(CP437_CHARS[c] for c in cp437_bytes)
-    return unicode_text
+ALPHA: ColorIndex = 0xFF
+
+CP437_INDEX_TO_CHAR: List[Char] = list(bytes(range(256)).decode('cp437'))
+CP437_CHAR_TO_INDEX: Mapping[Char, int] = {c: i for i, c in enumerate(CP437_INDEX_TO_CHAR)}
+
+ANSI_SCREEN_SIZE: Coords = (80, 25)
 
 
-def text_measure(text, widths):
-    width = sum(widths[c] for c in text)
-    return width
+def text_measure(
+    text: str,
+    widths: Sequence[Coord],
+    char_to_index: Mapping[Char, int] = CP437_CHAR_TO_INDEX,
+) -> Coord:
+
+    return sum(widths[char_to_index[c]] for c in text)
 
 
-def text_wrap(text, max_width, widths):
-    lines = []
-    start, endex = 0, 0
+def text_wrap(
+    text: str,
+    max_width: Coord,
+    widths: Sequence[Coord],
+    char_to_index: Mapping[Char, int] = CP437_CHAR_TO_INDEX,
+) -> List[str]:
+
+    lines: List[str] = []
+    start = 0
+    endex = 0
     width = 0
+
     for c in text:
-        delta = widths[c]
-        assert delta <= max_width
+        delta = widths[char_to_index[c]]
         if width + delta <= max_width and c not in '\n\v':
             width += delta
             endex += 1
@@ -111,35 +113,54 @@ def text_wrap(text, max_width, widths):
     return lines
 
 
-def pixels_transpose(pixels, size):
+def pixels_transpose(
+    pixels: Sequence[ColorIndex],
+    size: Coords,
+) -> Iterator[ColorIndex]:
+
     width, height = size
-    yield from (pixels[x * width + y]
-                for y in range(height)
-                for x in range(width))
+
+    for y in range(height):
+        for x in range(width):
+            yield pixels[x * width + y]
 
 
-def pixels_linearize(pixels, size):
+def pixels_linearize(
+    pixels: Sequence[ColorIndex],
+    size: Coords,
+) -> Iterator[ColorIndex]:
+
     width, height = size
-    assert width % 4 == 0
+    if width % 4:
+        raise ValueError(f'width must be divisible by 4: {width}')
     width_4 = width >> 2
     area_4 = width_4 * height
-    yield from (pixels[(y * width_4 + (x >> 2)) + ((x & 3) * area_4)]
-                for y in range(height)
-                for x in range(width))
+
+    for y in range(height):
+        for x in range(width):
+            yield pixels[(y * width_4 + (x >> 2)) + ((x & 3) * area_4)]
 
 
-def sprite_expand(chunk, size, alpha_index=0xFF):
+def sprite_expand(
+    chunk: ByteString,
+    size: Coords,
+    alpha: ColorIndex = ALPHA,
+) -> bytearray:
+
     width, height = size
-    header = SpriteHeader.from_bytes(chunk)
-    expanded = bytearray([alpha_index]) * (width * height)
+    if width < 1:
+        raise ValueError(f'invalid width: {width}')
+    if height < 1:
+        raise ValueError(f'invalid height: {height}')
 
+    header, _ = SpriteHeader.from_bytes(chunk)
+    expanded = bytearray().ljust((width * height), bytes([alpha]))
     unpack_from = struct.unpack_from
-
     x = header.left
+
     for offset in header.offsets:
-        assert 0 <= offset < len(chunk)
         while True:
-            y_endex = unpack_from('<H', chunk, offset)[0]
+            y_endex, = unpack_from('<H', chunk, offset)
             offset += 2
             if y_endex:
                 y_base, y_start = unpack_from('<hH', chunk, offset)
@@ -151,136 +172,194 @@ def sprite_expand(chunk, size, alpha_index=0xFF):
             else:
                 break
         x += 1
-    return bytes(expanded)
+
+    return expanded
 
 
-def rgbpalette_flatten(palette_colors):
-    flat_palette = []
+def rgbpalette_flatten(palette_colors: PaletteRGB) -> PaletteFlat:
+    flat_palette: PaletteFlat = []
+    append = flat_palette.append
+
     for color in palette_colors:
-        assert len(color) == 3
-        flat_palette += color
+        r, g, b = color
+        append(r)
+        append(g)
+        append(b)
+
     return flat_palette
 
 
-def rgbpalette_split(flat_palette):
-    assert len(flat_palette) % 3 == 0
-    palette_colors = []
+def rgbpalette_split(flat_palette: PaletteFlat) -> PaletteRGB:
+    if len(flat_palette) % 3:
+        raise ValueError(f'flat palette length must be divisible by 3: {len(flat_palette)}')
+    palette_colors: List[ColorRGB] = []
+
     for i in range(0, len(flat_palette), 3):
-        palette_colors.append(list(flat_palette[i:(i + 3)]))
+        r = flat_palette[i]
+        g = flat_palette[i + 1]
+        b = flat_palette[i + 2]
+        rgb = (r, g, b)
+        palette_colors.append(rgb)
+
     return palette_colors
 
 
-def make_8bit_image(size, pixels, palette, alpha_index=None):
+def make_8bit_image(
+    size: Coords,
+    pixels: Sequence[ColorIndex],
+    palette_flat: PaletteFlat,
+    alpha: Optional[ColorIndex] = None,
+) -> Image:
+
     image = Image.frombuffer('P', size, pixels, 'raw', 'P', 0, 1)
-    image.putpalette(palette)
-    if alpha_index is not None:
-        image.info['transparency'] = alpha_index
+    image.putpalette(palette_flat)
+    if alpha is not None:
+        image.info['transparency'] = alpha
     return image
 
 
-def jascpal_read(stream):
+def jascpal_read(stream: io.TextIOBase) -> PaletteRGB:
     line = stream.readline().strip()
-    assert line == 'JASC-PAL'
+    if line != 'JASC-PAL':
+        raise ValueError('expected "JASC-PAL"')
+
     line = stream.readline().strip()
-    assert line == '0100'
+    if line != '0100':
+        raise ValueError('expected "0100"')
+
     line = stream.readline().strip()
     count = int(line)
-    assert count > 0
-    palette = [None] * count
+    if count <= 0:
+        raise ValueError(f'count not positive: {count}')
+
+    palette: List[ColorRGB] = []
     for i in range(count):
-        r, g, b = [int(x) for x in stream.readline().split()]
-        assert 0x00 <= r <= 0xFF
-        assert 0x00 <= g <= 0xFF
-        assert 0x00 <= b <= 0xFF
-        palette[i] = [r, g, b]
+        r, g, b = stream.readline().split()
+        r = int(r)
+        g = int(g)
+        b = int(b)
+        rgb = (r, g, b)
+        if not ((0x00 <= r <= 0xFF) and (0x00 <= g <= 0xFF) and (0x00 <= b <= 0xFF)):
+            raise ValueError(f'invalid RGB color: {rgb}')
+        palette.append(rgb)
     return palette
 
 
-def jascpal_write(stream, palette):
-    assert palette
-    stream_write(stream, 'JASC-PAL\n')
-    stream_write(stream, '0100\n')
-    stream_write(stream, '{:d}\n'.format(len(palette)))
-    for r, g, b in palette:
-        assert 0x00 <= r <= 0xFF
-        assert 0x00 <= g <= 0xFF
-        assert 0x00 <= b <= 0xFF
-        stream_write(stream, '{:d} {:d} {:d}\n'.format(r, g, b))
+def jascpal_write(stream: io.TextIOBase, palette: PaletteRGB) -> None:
+    stream.write('JASC-PAL\n')
+    stream.write('0100\n')
+    stream.write('{:d}\n'.format(len(palette)))
+    for rgb in palette:
+        r, g, b = rgb
+        if not ((0x00 <= r <= 0xFF) and (0x00 <= g <= 0xFF) and (0x00 <= b <= 0xFF)):
+            raise ValueError(f'invalid RGB color: {rgb}')
+        stream.write(f'{r:d} {g:d} {b:d}\n')
 
 
-def write_targa_bgrx(stream, size, depth_bits, pixels_bgrx):
-    stream_pack(stream, '<BBBHHBHHHHBB',
-                0,  #  id_length
-                0,  # colormap_type
-                2,  # image_type: BGR(A)
-                0,  # colormap_index
-                0,  # colormap_length
-                0,  # colormap_size
-                0,  # x_origin
-                0,  # y_origin
-                size[0],  # width
-                size[1],  # height
-                depth_bits,  # pixel_size: 24 (BGR) | 32 (BGRA)
-                0x00)  # attributes
-    stream_write(stream, pixels_bgrx)
+def write_targa_bgrx(
+    stream: io.BufferedReader,
+    size: Coords,
+    depth_bits: int,
+    pixels_bgrx: Sequence[ColorIndex],
+) -> None:
+
+    width, height = size
+    if width < 0 or height < 0:
+        raise ValueError(f'invalid size: {size}')
+    if depth_bits != 24 or depth_bits != 32:
+        raise ValueError(f'depth bits must be either 24 or 32: {depth_bits}')
+    pixel_data_expected = width * height * (depth_bits // 8)
+    if len(pixels_bgrx) < pixel_data_expected:
+        raise ValueError(f'not enough pixel data: '
+                         f'actual={len(pixels_bgrx)} < expected={pixel_data_expected}')
+
+    header_chunk = struct.pack(
+        '<BBBHHBHHHHBB',
+        0,  # id_length
+        0,  # colormap_type
+        2,  # image_type: BGR(A)
+        0,  # colormap_index
+        0,  # colormap_length
+        0,  # colormap_size
+        0,  # x_origin
+        0,  # y_origin
+        width,  # width
+        height,  # height
+        depth_bits,  # pixel_size: 24 (BGR) | 32 (BGRA)
+        0x00,  # attributes
+    )
+    stream.write(header_chunk)
+    stream.write(pixels_bgrx)
 
 
-def build_color_image(size, color):
-    return Image.new('RGB', size, color)
+def build_color_image(size: Coords, rgb: ColorRGB) -> Image:
+    return Image.new('RGB', size, rgb)
 
 
-WINFNT_HEADER_FMT = (
-    ('dfVersion', '<H'),
-    ('dfSize', '<L'),
-    ('dfCopyright', '<60s'),
-    ('dfType', '<H'),
-    ('dfPoints', '<H'),
-    ('dfVertRes', '<H'),
-    ('dfHorizRes', '<H'),
-    ('dfAscent', '<H'),
-    ('dfInternalLeading', '<H'),
-    ('dfExternalLeading', '<H'),
-    ('dfdfItalic', '<B'),
-    ('dfUnderline', '<B'),
-    ('dfStrikeOut', '<B'),
-    ('dfWeight', '<H'),
-    ('dfCharSet', '<B'),
-    ('dfPixWidth', '<H'),
-    ('dfPixHeight', '<H'),
-    ('dfPitchAndFamily', '<B'),
-    ('dfAvgWidth', '<H'),
-    ('dfMaxWidth', '<H'),
-    ('dfFirstChar', '<B'),
-    ('dfLastChar', '<B'),
-    ('dfDefaultChar', '<B'),
-    ('dfBreakChar', '<B'),
-    ('dfWidthBytes', '<H'),
-    ('dfDevice', '<L'),
-    ('dfFace', '<L'),
-    ('dfBitsPointer', '<L'),
-    ('dfBitsOffset', '<L'),
-    ('dfReserved', '<B'),
-)
+WINFNT_HEADER_FMT: Mapping[str, str] = {
+    'dfVersion':         '<H',
+    'dfSize':            '<L',
+    'dfCopyright':       '<60s',
+    'dfType':            '<H',
+    'dfPoints':          '<H',
+    'dfVertRes':         '<H',
+    'dfHorizRes':        '<H',
+    'dfAscent':          '<H',
+    'dfInternalLeading': '<H',
+    'dfExternalLeading': '<H',
+    'dfdfItalic':        '<B',
+    'dfUnderline':       '<B',
+    'dfStrikeOut':       '<B',
+    'dfWeight':          '<H',
+    'dfCharSet':         '<B',
+    'dfPixWidth':        '<H',
+    'dfPixHeight':       '<H',
+    'dfPitchAndFamily':  '<B',
+    'dfAvgWidth':        '<H',
+    'dfMaxWidth':        '<H',
+    'dfFirstChar':       '<B',
+    'dfLastChar':        '<B',
+    'dfDefaultChar':     '<B',
+    'dfBreakChar':       '<B',
+    'dfWidthBytes':      '<H',
+    'dfDevice':          '<L',
+    'dfFace':            '<L',
+    'dfBitsPointer':     '<L',
+    'dfBitsOffset':      '<L',
+    'dfReserved':        '<B',
+}
 
-BYTE_MASK_EXPANDED = tuple(bytes([1 if m & (1 << (7 - b)) else 0 for b in range(8)]) for m in range(256))
-BYTE_MASK_TO_BYTES = tuple(bytes([0xFF if m & (1 << (7 - b)) else 0x00 for b in range(8)]) for m in range(256))
+BYTE_MASK_EXPANDED: List[bytes] = [
+    bytes([1 if m & (1 << (7 - b)) else 0
+           for b in range(8)])
+    for m in range(256)
+]
+
+BYTE_MASK_TO_BYTES: List[bytes] = [
+    bytes([0xFF if m & (1 << (7 - b)) else 0x00
+           for b in range(8)])
+    for m in range(256)
+]
 
 
-def winfnt_read(stream):
+def winfnt_read(stream: io.BufferedReader) -> Tuple[Dict[str, Any], List[Image]]:
     start = stream.tell()
-    fields = collections.OrderedDict((name, stream_unpack(fmt, stream)[0])
-                                     for name, fmt in WINFNT_HEADER_FMT)
+    fields = {name: struct.unpack(fmt, stream.read(struct.calcsize(fmt)))[0]
+              for name, fmt in WINFNT_HEADER_FMT.items()}
     fields['dfCopyright'] = fields['dfCopyright'].rstrip(b'\0')
     count = fields['dfLastChar'] - fields['dfFirstChar'] + 2
-    fields['dfCharTable'] = [stream_unpack('<HH', stream) for _ in range(count)]
+    fields['dfCharTable'] = [struct.unpack('<HH', stream.read(4)) for _ in range(count)]
     height = fields['dfPixHeight']
 
-    palette = (0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF)
-    images = []
+    palette_flat: PaletteFlat = [
+        0x00, 0x00, 0x00,
+        0xFF, 0xFF, 0xFF,
+    ]
+    images: List[Image] = []
 
     for width, offset in fields['dfCharTable']:
         stream.seek(start + offset)
-        lines = [[] for y in range(height)]
+        lines = [[] for _ in range(height)]
         padded_width = (width + 7) & 0xFFF8
 
         for _ in range(padded_width >> 3):
@@ -288,16 +367,17 @@ def winfnt_read(stream):
                 mask = stream.read(1)
                 lines[y].append(mask)
 
-        bitmap = b''.join(b''.join(line) for line in lines)
-        pixels = b''.join(BYTE_MASK_EXPANDED[mask] for mask in bitmap)
-        image = make_8bit_image((padded_width, height), pixels, palette)
+        bitmap_flat = b''.join(b''.join(line) for line in lines)
+        pixels_flat = b''.join(BYTE_MASK_EXPANDED[mask] for mask in bitmap_flat)
+        size = (padded_width, height)
+        image = make_8bit_image(size, pixels_flat, palette_flat)
         image = image.crop((0, 0, width, height))
         images.append(image)
 
     return fields, images
 
 
-ANSI_PALETTE = (
+ANSI_PALETTE_FLAT: PaletteFlat = [
     0x00, 0x00, 0x00,  # Black
     0x00, 0x00, 0xAA,  # Blue
     0x00, 0xAA, 0x00,  # Green
@@ -315,30 +395,40 @@ ANSI_PALETTE = (
     0xFF, 0x55, 0xFF,  # Light Magenta
     0xFF, 0xFF, 0x55,  # Yellow
     0xFF, 0xFF, 0xFF,  # White
-)
+]
 
 
-def render_ansi_line(ansi_image, cursor, font, text, attrs, special=None, font_size=None):
+def render_ansi_line(
+    image: Image,
+    font_impl: ImageFont,
+    cursor: Coords,
+    text: str,
+    attrs: Sequence[int],
+    special: Optional[str] = None,
+    font_size: Optional[Coords] = None,
+) -> None:
+
+    if len(text) != len(attrs):
+        raise ValueError('text and attrs must have the same length')
     if font_size is None:
-        font_size = font.getsize('\u2588')  # full block
+        font_size = font_impl.getsize('\u2588')  # full block
     font_width, font_height = font_size
-    image_width, image_height = ansi_image.size
+    image_width, image_height = image.size
     text_width = image_width // font_width
     text_height = image_height // font_height
     cursor_x, cursor_y = cursor
-    left = cursor[0] * font_width
-    top = cursor[1] * font_height
-    bg_mask = 0x0F if special is 'fullcolor' else 0x07
-    draw = ImageDraw.Draw(ansi_image)
+    left = cursor_x * font_width
+    top = cursor_y * font_height
+    bg_mask = 0x0F if special == 'fullcolor' else 0x07
+    context = ImageDraw.Draw(image)
 
     for char, attr in zip(text, attrs):
-        bg = (attr >> 4) & bg_mask
-
-        box = (left, top, left + font_width - 1, top + font_height - 1)
-        draw.rectangle(box, fill=bg)
-
-        fg = bg if special is 'hide' and attr & 0x80 else attr & 0x0F
-        draw.text((left, top), char, font=font, fill=fg)
+        if left > -font_width and top > -font_height:
+            bg = (attr >> 4) & bg_mask
+            box = (left, top, (left + font_width - 1), (top + font_height - 1))
+            context.rectangle(box, fill=bg)
+            fg = bg if special == 'hide' and attr & 0x80 else attr & 0x0F
+            context.text((left, top), char, font=font_impl, fill=fg)
 
         left += font_width
         cursor_x += 1
@@ -351,20 +441,40 @@ def render_ansi_line(ansi_image, cursor, font, text, attrs, special=None, font_s
             break
 
 
-def create_ansi_image(text_size, font_size, color=0, palette=ANSI_PALETTE):
-    size = (text_size[0] * font_size[0], text_size[1] * font_size[1])
+def create_ansi_image(
+    text_size: Coords,
+    font_size: Coords,
+    color: ColorIndex = 0,
+    palette_flat: Optional[PaletteFlat] = None,
+) -> Image:
+
+    text_width, text_height = text_size
+    if text_width < 1 or text_height < 1:
+        raise ValueError(f'invalid text size: {text_size}')
+    font_width, font_height = font_size
+    if font_width < 1 or font_height < 1:
+        raise ValueError(f'invalid font size: {font_size}')
+    if palette_flat is None:
+        palette_flat = ANSI_PALETTE_FLAT
+
+    size = ((text_width * font_width), (text_height * font_height))
     image = Image.new('P', size, color=color)
-    image.putpalette(palette)
+    image.putpalette(palette_flat)
     return image
 
 
-class Picture(object):
+class Picture:
 
-    def __init__(self, size, pixels, palette, alpha_index=None):
-        image = make_8bit_image(size, pixels, palette, alpha_index)
-
-        self.size = size
-        self.image = image
+    def __init__(
+        self,
+        size: Coords,
+        pixels_flat: PixelsFlat,
+        palette_flat: PaletteFlat,
+        alpha: Optional[ColorIndex] = None,
+    ):
+        image = make_8bit_image(size, pixels_flat, palette_flat, alpha=alpha)
+        self.image: Image = image
+        self.size: Coords = size
 
 
 class PictureManager(ResourceManager):
@@ -378,10 +488,38 @@ class PictureManager(ResourceManager):
         palette_map = self._palette_map
         start = self._start
 
-        size = chunks_handler.pics_size[index]
+        size = chunks_handler._pics_size[index]
         pixels = bytes(pixels_linearize(chunk, size))
         palette = palette_map.get((start + index), palette_map[...])
         return Picture(size, pixels, palette)
+
+
+class PictureLibrary(ResourceLibrary[Index, Picture]):
+
+    def __init__(
+        self,
+        graphics_archive: GraphicsArchiveReader,
+        palette_map: Mapping[Optional[Index], PaletteFlat],
+        resource_cache: Optional[Cache[Index, Picture]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            graphics_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._palette_map: Mapping[Optional[Index], PaletteFlat] = palette_map
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> Picture:
+        graphics_archive = _cast(GraphicsArchiveReader, self._archive)
+        size = graphics_archive.pics_size[index]
+        pixels = bytes(pixels_linearize(chunk, size))
+        palette_map = self._palette_map
+        palette = palette_map.get(self._start + index, palette_map[None])
+        instance = Picture(size, pixels, palette)
+        return instance
 
 
 class Tile8Manager(ResourceManager):
@@ -403,18 +541,53 @@ class Tile8Manager(ResourceManager):
         area = size[0] * size[1]
         offset = index * area
         chunk = chunk[offset:(offset + area)]
-        pixels = bytes(pixels_linearize(chunk, size))
-        palette = palette_map.get(start, palette_map[...])
-        return Picture(size, pixels, palette)
+        pixels_flat = bytes(pixels_linearize(chunk, size))
+        palette_flat = palette_map.get(start, palette_map[...])
+        return Picture(size, pixels_flat, palette_flat)
 
 
-class Texture(object):
+class Tile8Library(ResourceLibrary[Index, Picture]):
 
-    def __init__(self, size, pixels, palette, alpha_index=None):
-        image = make_8bit_image(size, pixels, palette, alpha_index)
+    def __init__(
+        self,
+        graphics_archive: GraphicsArchiveReader,
+        palette_map: Mapping[Optional[Index], PaletteFlat],
+        resource_cache: Optional[Cache[Index, Picture]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            graphics_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._palette_map: Mapping[Optional[Index], PaletteFlat] = palette_map
 
-        self.size = size
-        self.image = image
+    def _get_resource(self, index: Index, chunk: Chunk) -> Picture:
+        size = (8, 8)
+        area = 8 * 8
+        offset = index * area
+        chunk = chunk[offset:(offset + area)]
+        pixels_flat = bytes(pixels_linearize(chunk, size))
+        palette_map = self._palette_map
+        palette_flat = palette_map.get(self._start, palette_map[None])
+        instance = Picture(size, pixels_flat, palette_flat)
+        return instance
+
+
+class Texture:
+
+    def __init__(
+        self,
+        size: Coords,
+        pixels_flat: PixelsFlat,
+        palette_flat: PaletteFlat,
+        alpha: Optional[ColorIndex] = None,
+    ):
+        image = make_8bit_image(size, pixels_flat, palette_flat, alpha=alpha)
+        self.image: Image = image
+        self.size: Coords = size
 
 
 class TextureManager(ResourceManager):
@@ -433,160 +606,329 @@ class TextureManager(ResourceManager):
         return Texture(size, pixels, palette)
 
 
-class SpriteHeader(BinaryResource):
+class TextureLibrary(ResourceLibrary[Index, Texture]):
 
-    def __init__(self, left, right, offsets):
-        self.left = left
-        self.right = right
-        self.offsets = offsets
+    def __init__(
+        self,
+        vswap_archive: VswapArchiveReader,
+        palette_flat: PaletteFlat,
+        size: Coords,
+        resource_cache: Optional[Cache[Index, Texture]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            vswap_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._palette_flat: PaletteFlat = palette_flat
+        self._size: Coords = size
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> Texture:
+        size = self._size
+        pixels_flat = bytes(pixels_transpose(chunk, size))
+        instance = Texture(size, pixels_flat, self._palette_flat)
+        return instance
+
+
+class SpriteHeader(Codec):
+
+    def __init__(
+        self,
+        left: Coord,
+        right: Coord,
+        offsets: Sequence[Coord],
+    ):
+        if left < 0:
+            raise ValueError('negative left')
+        if right < 0:
+            raise ValueError('negative right')
+        width = right - left + 1
+        if len(offsets) != width:
+            raise ValueError(f'wrong offsets count: actual={len(offsets)} != expected={width}')
+
+        self.left: Coord = left
+        self.right: Coord = right
+        self.offsets: Sequence[Coord] = offsets
 
     @classmethod
-    def from_stream(cls, chunk_stream):
-        left, right = stream_unpack('<HH', chunk_stream)
+    def calcsize_stateless(cls) -> Offset:
+        raise NotImplementedError('unavailable')
+
+    def to_bytes(self) -> bytes:
+        chunk = struct.pack(f'<HH{len(self.offsets)}H',
+                            self.left, self.right, *self.offsets)
+        return chunk
+
+    @classmethod
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+        offset = int(offset)
+        left, right = struct.unpack_from('<HH', buffer, offset)
+        offset += 2
+
         width = right - left + 1
-        offsets = list(stream_unpack_array('<H', chunk_stream, width))
-        return cls(left, right, offsets)
+        offsets = list(struct.unpack_from(f'<{width}H', buffer, offset))
+        offset += width * 2
 
-    def to_stream(self, stream):
-        stream_pack(stream, '<HH', self.left, self.right)
-        stream_pack_array(stream, '<H', self.offsets)
+        instance = cls(left, right, offsets)
+        return instance, offset
+
+    @classmethod
+    def from_stream(cls, stream: io.BufferedReader) -> Self:
+        buffer = stream.read(4)
+        left, right = struct.unpack('<HH', buffer)
+        width = right - left + 1
+        buffer += stream.read(width * 2)
+        instance = cls.from_bytes(buffer)
+        return instance
 
 
-class Sprite(object):
+class Sprite:
 
-    def __init__(self, size, pixels, palette, alpha_index=ALPHA_INDEX):
-        image = make_8bit_image(size, pixels, palette, alpha_index)
-
-        self.size = size
-        self.image = image
-        self.alpha_index = alpha_index
+    def __init__(
+        self,
+        size: Coords,
+        pixels: PixelsFlat,
+        palette: PaletteFlat,
+        alpha: ColorIndex = ALPHA,
+    ):
+        image = make_8bit_image(size, pixels, palette, alpha=alpha)
+        self.image: Image = image
+        self.size: Coords = size
+        self.alpha: ColorIndex = alpha
 
 
 class SpriteManager(ResourceManager):
 
     def __init__(self, chunks_handler, palette, size,
-                 start=None, count=None, alpha_index=ALPHA_INDEX):
+                 start=None, count=None, alpha=ALPHA):
         super().__init__(chunks_handler, start, count)
         self._palette = palette
         self._size = size
-        self._alpha_index = alpha_index
+        self._alpha = alpha
 
     def _load_resource(self, index, chunk):
         palette = self._palette
         size = self._size
-        alpha_index = self._alpha_index
+        alpha = self._alpha
 
-        pixels = sprite_expand(chunk, size, alpha_index)
+        pixels = sprite_expand(chunk, size, alpha)
         pixels = bytes(pixels_transpose(pixels, size))
-        return Sprite(size, pixels, palette, alpha_index)
+        return Sprite(size, pixels, palette, alpha)
 
 
-class FontHeader(BinaryResource):
+class SpriteLibrary(ResourceLibrary[Index, Sprite]):
 
-    CHARACTER_COUNT = 256
+    def __init__(
+        self,
+        vswap_archive: VswapArchiveReader,
+        palette_flat: PaletteFlat,
+        size: Coords,
+        resource_cache: Optional[Cache[Index, Sprite]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+        alpha: ColorIndex = ALPHA,
+    ):
+        super().__init__(
+            vswap_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._palette_flat: PaletteFlat = palette_flat
+        self._size: Coords = size
+        self._alpha: ColorIndex = alpha
 
-    def __init__(self, height, offsets, widths):
-        assert 0 < height
-        assert len(offsets) == type(self).CHARACTER_COUNT
-        assert len(widths) == type(self).CHARACTER_COUNT
+    def _get_resource(self, index: Index, chunk: Chunk) -> Sprite:
+        del index
+        size = self._size
+        alpha = self._alpha
+        pixels_flat = sprite_expand(chunk, size, alpha)
+        pixels_flat = bytes(pixels_transpose(pixels_flat, size))
+        instance = Sprite(size, pixels_flat, self._palette_flat, alpha)
+        return instance
 
-        self.height = height
-        self.offsets = offsets
-        self.widths = widths
+
+class FontHeader(Codec):
+    CHARACTER_COUNT: int = 256
+
+    def __init__(
+        self,
+        height: Coord,
+        offsets: Sequence[Coord],
+        widths: Sequence[Coord],
+    ):
+        if height < 1:
+            raise ValueError(f'invalid height: {height}')
+        if len(offsets) != self.CHARACTER_COUNT:
+            raise ValueError('wrong offsets count')
+        if len(widths) != self.CHARACTER_COUNT:
+            raise ValueError('wrong widths count')
+
+        self.height: Coord = height
+        self.offsets: Sequence[Coord] = offsets
+        self.widths: Sequence[Coord] = widths
 
     @classmethod
-    def from_stream(cls, chunk_stream):
-        height = stream_unpack('<H', chunk_stream)[0]
-        offsets = list(stream_unpack_array('<H', chunk_stream, cls.CHARACTER_COUNT))
-        widths = list(stream_unpack_array('<B', chunk_stream, cls.CHARACTER_COUNT))
-        return cls(height, offsets, widths)
+    def calcsize_stateless(cls) -> Offset:
+        return 2 + ((2 * 2) * cls.CHARACTER_COUNT)
 
-    def to_stream(self, chunk_stream):
-        stream_pack(chunk_stream, '<H', self.height)
-        stream_pack_array(chunk_stream, '<H', self.locations)
-        stream_pack_array(chunk_stream, '<B', self.widths)
+    def to_bytes(self) -> bytes:
+        chunk = struct.pack(f'<H{len(self.offsets)}H{len(self.widths)}B',
+                            self.height, *self.offsets, *self.widths)
+        return chunk
+
+    @classmethod
+    def from_bytes(cls, buffer: ByteString, offset: Offset = 0) -> Tuple[Self, Offset]:
+        offset = int(offset)
+        height, = struct.unpack_from('<H', buffer, offset)
+        offset += 2
+
+        offsets = list(struct.unpack_from(f'<{cls.CHARACTER_COUNT}H', buffer, offset))
+        offset += cls.CHARACTER_COUNT * 2
+
+        widths = list(struct.unpack_from(f'={cls.CHARACTER_COUNT}B', buffer, offset))
+        offset += cls.CHARACTER_COUNT
+
+        instance = cls(height, offsets, widths)
+        return instance, offset
 
 
-class Font(object):
+class Font:
 
-    def __init__(self, height, widths, glyphs_pixels, palette, alpha_index=0xFF):
-        count = len(glyphs_pixels)
-        images = [None] * count
-        for i in range(count):
-            if widths[i]:
-                images[i] = make_8bit_image((widths[i], height), glyphs_pixels[i], palette)
+    def __init__(
+        self,
+        height: Coord,
+        widths: List[Coord],
+        glyphs_pixels_flat: Sequence[PixelsFlat],
+        palette: PaletteFlat,
+    ):
+        count = len(glyphs_pixels_flat)
+        images: Optional[List[Image]] = [None] * count
 
-        self.height = height
-        self.widths = widths
-        self.images = images
+        for glyph_index in range(count):
+            width = widths[glyph_index]
+            if width < 0:
+                raise ValueError('negative width')
 
-    def __len__(self):
+            if width:
+                size = (width, height)
+                pixels_flat = glyphs_pixels_flat[glyph_index]
+                image = make_8bit_image(size, pixels_flat, palette)
+                images[glyph_index] = image
+
+        self.height: Coord = height
+        self.widths: List[Coord] = widths
+        self.images: List[Optional[Image]] = images
+
+    def __len__(self) -> int:
         return len(self.widths)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Union[Index, Char]) -> Image:
         if isinstance(key, str):
             key = ord(key)
         return self.images[key]
 
-    def __call__(self, text_bytes):
-        get_image = self.images.__getitem__
-        yield from (get_image(ord(c)) for c in text_bytes)
-
-    def measure(self, text):
-        return text_measure(text, self.widths)
-
-    def wrap(self, text, max_width):
-        return text_wrap(text, max_width, self.widths)
+    def __call__(self, text_bytes: ByteString) -> Iterator[Image]:
+        images = self.images
+        for glyph_index in text_bytes:
+            yield from images[glyph_index]
 
 
 class FontManager(ResourceManager):
 
-    def __init__(self, chunks_handler, palette, start=None, count=None, alpha_index=0xFF):
+    def __init__(self, chunks_handler, palette, start=None, count=None, alpha=0xFF):
         super().__init__(chunks_handler, start, count)
         self._palette = palette
-        self._alpha_index = alpha_index
+        self._alpha = alpha
 
     def _load_resource(self, index, chunk):
         palette = self._palette
-        alpha_index = self._alpha_index
+        alpha = self._alpha
 
         header = FontHeader.from_bytes(chunk)
-        character_count = type(header).CHARACTER_COUNT
+        glyph_count = header.CHARACTER_COUNT
         height = header.height
-        assert 0 < height
-        glyphs_pixels = [None] * character_count
+        glyphs_pixels = [None] * glyph_count
 
-        for i in range(character_count):
-            offset = header.offsets[i]
-            width = header.widths[i]
-            glyphs_pixels[i] = chunk[offset:(offset + (width * height))]
+        for glyph_index in range(glyph_count):
+            offset = header.offsets[glyph_index]
+            width = header.widths[glyph_index]
+            glyphs_pixels[glyph_index] = chunk[offset:(offset + (width * height))]
 
-        return Font(height, header.widths, glyphs_pixels, palette, alpha_index)
+        return Font(height, header.widths, glyphs_pixels, palette, alpha=alpha)
 
 
-class DOSScreen(object):
+class FontLibrary(ResourceLibrary[Index, Font]):
 
-    def __init__(self, data, font, text_size, font_size=None):
-        assert len(data) % 2 == 0
+    def __init__(
+        self,
+        graphics_archive: GraphicsArchiveReader,
+        palette_flat: PaletteFlat,
+        resource_cache: Optional[Cache[Index, Font]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            graphics_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._palette_flat: PaletteFlat = palette_flat
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> Font:
+        del index
+        header, _ = FontHeader.from_bytes(chunk)
+        glyph_count = header.CHARACTER_COUNT
+        height = header.height
+        glyphs_pixels_flat: List[PixelsFlat] = []
+
+        for glyph_index in range(glyph_count):
+            offset = header.offsets[glyph_index]
+            width = header.widths[glyph_index]
+            pixels_flat = chunk[offset:(offset + (width * height))]
+            glyphs_pixels_flat.append(pixels_flat)
+
+        instance = Font(height, header.widths, glyphs_pixels_flat, self._palette_flat)
+        return instance
+
+
+class AnsiScreen:
+
+    def __init__(
+        self,
+        data: ByteString,
+        font_impl: ImageFont,
+        text_size: Coords,
+        font_size: Optional[Coords] = None,
+    ):
+        if len(data) % 2:
+            raise ValueError('data should be made of character+attributes pairs')
+        if font_size is None:
+            font_size = font_impl.getsize('\u2588')  # full block
+        chars = bytes(data[i] for i in range(9 + 0, len(data), 2))
+        attrs = bytes(data[i] for i in range(9 + 1, len(data), 2))
+
+        frame0 = create_ansi_image(text_size, font_size)
+        text = chars.decode('cp437')
+        render_ansi_line(frame0, font_impl, (0, 0), text, attrs, font_size=font_size)
+
+        frame1 = frame0
+        if any(attr & 0x80 for attr in attrs):
+            frame1 = create_ansi_image(text_size, font_size)
+            text = chars.decode('cp437')
+            render_ansi_line(frame1, font_impl, (0, 0), text, attrs,
+                             font_size=font_size, special='hide')
+
         self.chars = bytes(data[i] for i in range(9 + 0, len(data), 2))
         self.attrs = bytes(data[i] for i in range(9 + 1, len(data), 2))
-
-        if font_size is None:
-            font_size = font.getsize('\u2588')  # full block
-        frame0 = create_ansi_image(text_size, font_size)
-        text = cp437_to_unicode(self.chars)
-        render_ansi_line(frame0, (0, 0), font, text, self.attrs, font_size=font_size)
-
-        if any(attr & 0x80 for attr in self.attrs):
-            frame1 = create_ansi_image(text_size, font_size)
-            text = cp437_to_unicode(self.chars)
-            render_ansi_line(frame1, (0, 0), font, text, self.attrs, font_size=font_size, special='hide')
-            self.frames = [frame0, frame1]
-        else:
-            self.frames = [frame0]
-
-    def __len__(self):
-        return len(self.chars)
+        self.frame0: Image = frame0
+        self.frame1: Image = frame1
+        self.text_size: Coords = text_size
+        self.font_size: Coords = font_size
 
 
 class DOSScreenManager(ResourceManager):
@@ -598,10 +940,58 @@ class DOSScreenManager(ResourceManager):
         self._font_size = font_size
 
     def _load_resource(self, index, chunk):
-        return DOSScreen(chunk, self._font, self._size, self._font_size)
+        return AnsiScreen(chunk, self._font, self._size, self._font_size)
+
+
+class AnsiScreenLibrary(ResourceLibrary[Index, AnsiScreen]):
+
+    def __init__(
+        self,
+        graphics_archive: GraphicsArchiveReader,
+        font_impl: ImageFont,
+        resource_cache: Optional[Cache[Index, AnsiScreen]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+        text_size: Coords = ANSI_SCREEN_SIZE,
+        font_size: Optional[Coords] = None,
+    ):
+        super().__init__(
+            graphics_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+        self._font_impl: ImageFont = font_impl
+        self._text_size: Coords = text_size
+        self._font_size: Optional[Coords] = font_size
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> AnsiScreen:
+        instance = AnsiScreen(chunk, self._font_impl, self._text_size, self._font_size)
+        return instance
 
 
 class TextArtManager(ResourceManager):
 
     def _load_resource(self, index, chunk):
         return chunk.decode('ascii')
+
+
+class TextArtLibrary(ResourceLibrary[Index, TextArt]):
+
+    def __init__(
+        self,
+        graphics_archive: GraphicsArchiveReader,
+        resource_cache: Optional[Cache[Index, TextArt]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            graphics_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> TextArt:
+        instance = bytes(chunk).decode('ascii', errors='ignore')
+        return instance
