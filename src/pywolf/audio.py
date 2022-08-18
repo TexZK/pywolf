@@ -38,20 +38,23 @@ from typing import Sequence
 from typing import Tuple
 from typing import cast as _cast
 
-from .archives import AudioArchiveReader
-from .archives import ResourceLibrary
-from .archives import VswapArchiveReader
+from .base import ArchiveReader
 from .base import Cache
 from .base import Chunk
 from .base import Codec
 from .base import Index
 from .base import Offset
-from .utils import ResourceManager
+from .base import ResourceLibrary
+from .graphics import VswapArchiveReader
+from .utils import stream_fit
+from .utils import stream_unpack_array
 
 
 # (reg_index, reg_value, pre_delay)
 AdLibEvent = Tuple[int, int, int]
 
+
+# ============================================================================
 
 ADLIB_CARRIERS   = ( 3,  4,  5, 11, 12, 13, 19, 20, 21)
 ADLIB_MODULATORS = ( 0,  1,  2,  8,  9, 10, 16, 17, 18)
@@ -68,6 +71,8 @@ ADLIB_REG_FEEDBACK  = 0xC0
 ADLIB_REG_EFFECTS   = 0xBD
 ADLIB_REG_WAVE      = 0xE0
 
+
+# ============================================================================
 
 def samples_upsample_zoh(
     samples: Iterable[int],
@@ -100,6 +105,8 @@ def wave_write(
         wave_stream.setnframes(len(samples))
         wave_stream.writeframesraw(samples)  # FIXME: pack into bytes() if necessary
 
+
+# ============================================================================
 
 class SquareWaveGenerator:
 
@@ -300,6 +307,8 @@ def convert_wave_to_ogg(
     return ogg_path
 
 
+# ============================================================================
+
 class BuzzerSound:
 
     def __init__(
@@ -320,24 +329,6 @@ class BuzzerSound:
     def wave_write(self, file_path: str, rate: int = 44100):
         samples = bytes(self.to_samples(rate))
         wave_write(file_path, rate, samples)
-
-
-class BuzzerSoundManager(ResourceManager):
-
-    def __init__(self, chunks_handler, start=None, count=None):
-        super().__init__(chunks_handler, start, count)
-
-    def _load_resource(self, index, chunk):
-        instance = BuzzerSound(chunk)
-        return instance
-
-
-class BuzzerSoundLibrary(ResourceLibrary[Index, BuzzerSound]):
-
-    def _get_resource(self, index: Index, chunk: Chunk) -> BuzzerSound:
-        del index
-        instance = BuzzerSound(chunk)
-        return instance
 
 
 class AdLibSoundHeader(Codec):
@@ -536,39 +527,6 @@ class AdLibSound(Codec):
         return chunk
 
 
-class AdLibSoundManager(ResourceManager):
-
-    def __init__(self, chunks_handler, start=None, count=None, old_muse_compatibility=False):
-        super().__init__(chunks_handler, start, count)
-        self.old_muse_compatibility = old_muse_compatibility
-
-    def _load_resource(self, index, chunk):
-        instance, _ = AdLibSound.from_bytes(chunk)
-        return instance
-
-
-class AdLibSoundLibrary(ResourceLibrary[Index, AdLibSound]):
-
-    def __init__(
-        self,
-        audio_archive: AudioArchiveReader,
-        resource_cache: Optional[Cache[Index, AdLibSound]] = None,
-        start: Optional[Index] = None,
-        count: Optional[Index] = None,
-    ):
-        super().__init__(
-            audio_archive,
-            resource_cache=resource_cache,
-            start=start,
-            count=count,
-        )
-
-    def _get_resource(self, index: Index, chunk: Chunk) -> AdLibSound:
-        del index
-        instance, _ = AdLibSound.from_bytes(chunk)
-        return instance
-
-
 class Music(Codec):
 
     def __init__(
@@ -626,13 +584,116 @@ class Music(Codec):
         return chunk
 
 
-class MusicManager(ResourceManager):
+class SampledSound:
 
-    def __init__(self, chunks_handler, start=None, count=None):
-        super().__init__(chunks_handler, start, count)
+    def __init__(
+        self,
+        rate: int,
+        samples: Sequence[int],
+    ):
+        self.rate: int = rate
+        self.samples: Sequence[int] = samples
 
-    def _load_resource(self, index, chunk):
-        return Music.from_bytes(chunk)
+    def wave_write(self, file_path: str) -> None:
+        wave_write(file_path, self.rate, bytes(self.samples))
+
+
+# ============================================================================
+
+class AudioArchiveReader(ArchiveReader):
+
+    def __init__(
+        self,
+        chunk_cache: Optional[Cache[Index, Chunk]] = None,
+    ):
+        super().__init__(chunk_cache=chunk_cache)
+
+        self._header_stream: Optional[io.BufferedReader] = None
+        self._header_offset: Offset = 0
+        self._header_size: Offset = 0
+
+    def _read_chunk(self, index: Index) -> bytes:
+        chunk_size = self.sizeof(index)
+        self._seek_chunk(index)
+        chunk = self._data_stream.read(chunk_size)
+        return chunk
+
+    def clear(self) -> None:
+        super().clear()
+        self._header_stream = None
+        self._header_offset = 0
+        self._header_size = 0
+
+    def close(self) -> None:
+        super().close()
+        self._header_stream = None
+
+    def open(
+        self,
+        data_stream: Optional[io.BufferedReader] = None,
+        data_offset: Optional[Offset] = None,
+        data_size: Optional[Offset] = None,
+        header_stream: Optional[io.BufferedReader] = None,
+        header_offset: Optional[Offset] = None,
+        header_size: Optional[Offset] = None,
+    ) -> None:
+
+        if header_stream is None:
+            raise ValueError('a header stream should be provided')
+        super().open(data_stream, data_offset=data_offset, data_size=data_size)
+
+        header_offset, header_size = stream_fit(header_stream, header_offset, header_size)
+        if header_size % 4:
+            raise ValueError(f'header size must be divisible by 4: {header_size}')
+
+        data_size = self._data_size
+        chunk_count = header_size // 4
+        chunk_offsets = list(stream_unpack_array('<L', header_stream, chunk_count))
+        chunk_offsets.append(data_size)
+
+        for index in range(chunk_count):
+            if not 0 <= chunk_offsets[index] <= data_size:
+                raise ValueError(f'invalid offset value: index={index}')
+            if not chunk_offsets[index] <= chunk_offsets[index + 1]:
+                raise ValueError(f'invalid offset ordering: index={index}')
+
+        self._chunk_count = chunk_count
+        self._chunk_offsets = chunk_offsets
+        self._header_stream = header_stream
+        self._header_offset = header_offset
+        self._header_size = header_size
+
+
+# ============================================================================
+
+class BuzzerSoundLibrary(ResourceLibrary[Index, BuzzerSound]):
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> BuzzerSound:
+        del index
+        instance = BuzzerSound(chunk)
+        return instance
+
+
+class AdLibSoundLibrary(ResourceLibrary[Index, AdLibSound]):
+
+    def __init__(
+        self,
+        audio_archive: AudioArchiveReader,
+        resource_cache: Optional[Cache[Index, AdLibSound]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        super().__init__(
+            audio_archive,
+            resource_cache=resource_cache,
+            start=start,
+            count=count,
+        )
+
+    def _get_resource(self, index: Index, chunk: Chunk) -> AdLibSound:
+        del index
+        instance, _ = AdLibSound.from_bytes(chunk)
+        return instance
 
 
 class MusicLibrary(ResourceLibrary[Index, Music]):
@@ -655,31 +716,6 @@ class MusicLibrary(ResourceLibrary[Index, Music]):
         del index
         instance, _ = Music.from_bytes(chunk)
         return instance
-
-
-class SampledSound:
-
-    def __init__(
-        self,
-        rate: int,
-        samples: Sequence[int],
-    ):
-        self.rate: int = rate
-        self.samples: Sequence[int] = samples
-
-    def wave_write(self, file_path: str) -> None:
-        wave_write(file_path, self.rate, bytes(self.samples))
-
-
-class SampledSoundManager(ResourceManager):
-
-    def __init__(self, chunks_handler, rate, start=None, count=None):
-        super().__init__(chunks_handler, start, count)
-        self.rate = rate
-
-    def _load_resource(self, index, chunk):
-        samples = bytes(samples_from_vswap(self._chunks_handler, index))
-        return SampledSound(self.rate, samples)
 
 
 class SampledSoundLibrary(ResourceLibrary[Index, SampledSound]):

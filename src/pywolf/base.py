@@ -27,32 +27,59 @@ import abc
 import collections.abc
 import io
 from typing import ByteString
+from typing import Dict
 from typing import Iterator
+from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import Tuple
 from typing import TypeVar
 from typing import Union
 
-Index = int
-Offset = int
-Chunk = ByteString
 
-GenericItem = TypeVar('GenericItem')
 KT = TypeVar('KT')
 KTS = Union[KT, slice]
 VT = TypeVar('VT')
+
+Index = int
+Offset = int
+
+Chunk = ByteString
 Char = str
 
 Coord = int
 Coords = Tuple[Coord, Coord]
 
-ColorIndex = int
-ColorRGB = Tuple[int, int, int]
-PaletteFlat: Sequence[ColorIndex]
-PaletteRGB = Sequence[ColorRGB]
-PixelsFlat = Sequence[ColorIndex]
 
+# ============================================================================
+
+# Defined here to avoid circular references
+def stream_fit(
+    stream: io.BufferedReader,
+    offset: Optional[Offset] = None,
+    size: Optional[Offset] = None,
+) -> Tuple[Offset, Offset]:
+
+    if offset is None:
+        offset = stream.tell()
+    else:
+        offset = offset.__index__()
+        if offset < 0:
+            raise ValueError('negative offset')
+
+    if size is None:
+        stream.seek(0, io.SEEK_END)
+        size = stream.tell() - offset
+    else:
+        size = size.__index__()
+        if size < 0:
+            raise ValueError('negative size')
+
+    stream.seek(offset, io.SEEK_SET)
+    return offset, size
+
+
+# ============================================================================
 
 class Cache(collections.abc.MutableMapping[KT, VT]):
 
@@ -95,7 +122,7 @@ class NoCache(Cache[KT, VT]):
         return default
 
     def set(self, key: KT, value: VT):
-        raise NotImplementedError
+        pass
 
 
 class PersistentCache(Cache[KT, VT], dict):
@@ -141,3 +168,171 @@ class Codec(abc.ABC):
         chunk = stream.read(size)
         instance, _ = cls.from_bytes(chunk)
         return instance
+
+
+# ============================================================================
+
+class ArchiveReader(collections.abc.Mapping[Index, Chunk]):
+
+    def __getitem__(
+        self,
+        key: Union[Index, slice],
+    ) -> Union[Chunk, List[Chunk]]:
+
+        if isinstance(key, slice):
+            start = max(0, key.start)
+            stop = min(key.stop, self._chunk_count)
+            step = key.step
+            return [self.get(index) for index in range(start, stop, step)]
+        else:
+            return self.get(key)
+
+    def __init__(
+        self,
+        chunk_cache: Optional[Cache[Index, Chunk]] = None,
+    ):
+        if chunk_cache is None:
+            chunk_cache = NoCache()
+
+        self._data_stream: Optional[io.BufferedReader] = None
+        self._data_offset: Offset = 0
+        self._data_size: Offset = 0
+        self._chunk_count: Index = 0
+        self._chunk_offsets: Dict[Index, Offset] = {}  # appended end offset
+        self._chunk_cache: Cache[Index, Chunk] = chunk_cache
+
+        chunk_cache.clear()
+
+    def __iter__(self) -> Iterator[Chunk]:
+        for index in range(self._chunk_count):
+            yield self.get(index)
+
+    def __len__(self) -> Index:
+        return self._chunk_count
+
+    @abc.abstractmethod
+    def _read_chunk(self, index: Index) -> Chunk:
+        ...
+
+    def _seek_chunk(
+        self,
+        index: Index,
+        offsets: Optional[Sequence[Offset]] = None,
+    ) -> None:
+
+        if offsets is None:
+            chunk_offset = self.offsetof(index)
+        else:
+            index = index.__index__()
+            if index < 0:
+                raise ValueError('negative index')
+            chunk_offset = offsets[index]
+
+        self._data_stream.seek(self._data_offset + chunk_offset, io.SEEK_SET)
+
+    def open(
+        self,
+        data_stream: Optional[io.BufferedReader] = None,
+        data_offset: Optional[Offset] = None,
+        data_size: Optional[Offset] = None,
+    ) -> None:
+
+        if data_stream is None:
+            raise ValueError('a data stream should be provided')
+        data_offset, data_size = stream_fit(data_stream, data_offset, data_size)
+
+        self._data_stream = data_stream
+        self._data_offset = data_offset
+        self._data_size = data_size
+
+    def close(self) -> None:
+        self._data_stream = None
+
+    def clear(self) -> None:
+        self._data_stream = None
+        self._data_offset = 0
+        self._data_size = 0
+        self._chunk_count = 0
+        self._chunk_offsets = []
+        self._chunk_cache.clear()
+
+    def get(self, index: Index) -> Chunk:
+        index = index.__index__()
+        if index < 0:
+            raise ValueError('negative index')
+        value = self._chunk_cache.get(index)
+        if value is None:
+            value = self._read_chunk(index)
+            self._chunk_cache.set(index, value)
+        return value
+
+    def offsetof(self, index: Index) -> Offset:
+        index = index.__index__()
+        if index < 0:
+            raise ValueError('negative index')
+        return self._chunk_offsets[index]
+
+    def sizeof(self, index: Index) -> Offset:
+        index = index.__index__()
+        if index < 0:
+            raise ValueError('negative index')
+        return self._chunk_offsets[index + 1] - self._chunk_offsets[index]
+
+
+# ============================================================================
+
+class ResourceLibrary(collections.abc.Mapping[KT, VT]):
+
+    def __getitem__(self, key: KTS) -> Union[VT, List[VT]]:
+        if isinstance(key, slice):
+            return [self.get(index) for index in range(key.start, key.stop, key.step)]
+        else:
+            return self.get(key.__index__())
+
+    def __init__(
+        self,
+        archive: ArchiveReader,
+        resource_cache: Optional[Cache[KT, VT]] = None,
+        start: Optional[Index] = None,
+        count: Optional[Index] = None,
+    ):
+        if start is None:
+            start = 0
+        if start < 0:
+            raise ValueError('negative start index')
+        if count is None:
+            count = len(archive) - start
+        if count < 0:
+            raise ValueError('negative count')
+        if count < start:
+            raise ValueError('count < start')
+        if resource_cache is None:
+            resource_cache = NoCache()
+
+        self._start: Index = start
+        self._count: Index = count
+        self._archive: ArchiveReader = archive
+        self._resource_cache: Cache[KT, VT] = resource_cache
+
+        resource_cache.clear()
+
+    def __iter__(self) -> Iterator[VT]:
+        for index in range(self._start, self._count - self._start):
+            yield self.get(index)
+
+    def __len__(self) -> Index:
+        return self._count
+
+    def _get_chunk(self, index: KT) -> Chunk:
+        return self._archive[self._start + index]
+
+    @abc.abstractmethod
+    def _get_resource(self, index: KT, chunk: Chunk) -> VT:
+        ...
+
+    def get(self, index: Index) -> VT:
+        value = self._resource_cache.get(index)
+        if value is None:
+            value = self._get_resource(index, self._get_chunk(index))
+            self._resource_cache[index] = value
+        return value
